@@ -6,7 +6,7 @@
     some ticks, not by moving fractionally.
 
     To add a new monster type, implement {!module-type:S} and hand the module
-    to {!Game.create}; see {!Monster.Chaser} for an example. *)
+    to {!Game.create}; see {!module-Monster.Chaser} for an example. *)
 
 open! Core
 
@@ -57,8 +57,17 @@ module type Monster = sig
     -> packed
 
   (** Shambles along a shortest path toward the player, resting every other
-      tick so a decisive player can outrun it. Waits if no path exists. *)
+      tick so a decisive player can outrun it. Waits if no path exists. The
+      easy-difficulty beast. *)
   module Chaser : S
+
+  (** Like {!Chaser} but rests only every third tick, so it gains ground
+      whenever the player hesitates. The normal-difficulty beast. *)
+  module Prowler : S
+
+  (** Like {!Chaser} but rests only every ninth tick: barely slower than the
+      player. The nightmare-difficulty beast. *)
+  module Sprinter : S
 
   (** Drifts to a random neighboring floor cell each tick. Harmless-ish;
       mostly a second example of implementing {!module-type:S}. *)

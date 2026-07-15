@@ -1,0 +1,17 @@
+(executable
+ (name main)
+ (modes js)
+ (js_of_ocaml
+  (flags
+   (:standard --effects=cps)))
+ (libraries core bonsai_web sandbox_web)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx)))
+
+; Keep the host page next to the compiled bundle so
+; _build/default/web/bin/index.html can be opened directly.
+
+(rule
+ (alias default)
+ (deps main.bc.js index.html)
+ (action (progn)))

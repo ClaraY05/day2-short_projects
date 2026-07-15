@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<!-- Minimal host page: everything visible is built in OCaml (Bonsai).
+     This file only loads the font, the compiled bundle, and the two CSS
+     rules a style attribute cannot express (keyframes and :hover). -->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camel O</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #000; }
+  * { box-sizing: border-box; }
+  ::selection { background: #ffe24a; color: #000; }
+  @keyframes slippulse {
+    0%, 100% { text-shadow: 0 0 8px #ff2d55, 0 0 22px #ff2d55; }
+    50% { text-shadow: 0 0 4px #ff2d55; }
+  }
+  button:hover { filter: brightness(1.3); }
+</style>
+<script defer src="main.bc.js"></script>
+</head>
+<body>
+<div id="app"></div>
+</body>
+</html>

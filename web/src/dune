@@ -1,0 +1,14 @@
+(library
+ (name sandbox_web)
+ (public_name sandbox.web)
+ (libraries
+  core
+  sandbox_engine
+  sandbox_app
+  bonsai
+  bonsai.extra
+  bonsai_web
+  virtual_dom
+  js_of_ocaml)
+ (preprocess
+  (pps ppx_jane bonsai.ppx_bonsai ppx_html js_of_ocaml-ppx)))

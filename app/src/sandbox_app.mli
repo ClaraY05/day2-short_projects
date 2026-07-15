@@ -1,16 +1,22 @@
-(** The terminal front end for {e Slip}.
+(** The pure application layer for {e Slip / Camel O}: everything the web
+    frontend needs decided that does not touch the DOM.
 
-    Everything here is I/O; the rules live in [sandbox.engine]. {!Render}
-    turns a {!Sandbox_engine.Game} into a screenful of text and {!Game_loop}
-    owns the keyboard and the terminal. *)
+    {!Flow} strings the {!Sandbox_engine.Game} together with the lobby, the
+    cutscenes and the end screens; the remaining modules are the pure data
+    each screen runs on. Rendering, the clock and the keyboard live in the
+    [sandbox.web] library. *)
 
-(** Timed full-screen animations (banana slips, jumpscares); frames not drawn
-    yet. *)
+(** Which keys mean what. *)
+module Controls = Controls
+
+(** Cutscene identities and durations. *)
 module Cutscene = Cutscene
 
-(** Raw-mode keyboard loop; the executable in [app/bin] just calls
-    {!Game_loop.run}. *)
-module Game_loop = Game_loop
+(** Easy / normal / nightmare presets. *)
+module Difficulty = Difficulty
 
-(** One screen of text per game phase. *)
-module Render = Render
+(** Lobby, playing, cutscene, won, lost — and how they chain. *)
+module Flow = Flow
+
+(** The walkable desert-camp intro. *)
+module Lobby = Lobby

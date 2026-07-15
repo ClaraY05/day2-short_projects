@@ -1,5 +1,0 @@
-(executable
- (name main)
- (libraries core sandbox_app)
- (preprocess
-  (pps ppx_jane)))

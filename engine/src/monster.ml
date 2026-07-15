@@ -39,6 +39,52 @@ module Chaser = struct
   ;;
 end
 
+(* One shortest-path step toward the player, or stay put if unreachable. *)
+let chase_step position ~maze ~player =
+  Maze.next_step_toward maze ~from:position ~goal:player
+  |> Option.value ~default:position
+;;
+
+module Prowler = struct
+  type t =
+    { position : Position.t
+    ; tick : int
+    }
+  [@@deriving sexp_of]
+
+  let name = "prowler"
+  let rest_every = 3
+  let create position = { position; tick = 0 }
+  let position t = t.position
+
+  let step t ~maze ~player ~random_state:_ =
+    let tick = t.tick + 1 in
+    if t.tick % rest_every = rest_every - 1
+    then { t with tick }
+    else { position = chase_step t.position ~maze ~player; tick }
+  ;;
+end
+
+module Sprinter = struct
+  type t =
+    { position : Position.t
+    ; tick : int
+    }
+  [@@deriving sexp_of]
+
+  let name = "sprinter"
+  let rest_every = 9
+  let create position = { position; tick = 0 }
+  let position t = t.position
+
+  let step t ~maze ~player ~random_state:_ =
+    let tick = t.tick + 1 in
+    if t.tick % rest_every = rest_every - 1
+    then { t with tick }
+    else { position = chase_step t.position ~maze ~player; tick }
+  ;;
+end
+
 module Wanderer = struct
   type t = Position.t [@@deriving sexp_of]
 

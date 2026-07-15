@@ -155,6 +155,21 @@ dune discovers libraries automatically as long as they have a `dune` file.
 ## Project layout
 
 ```
+engine/
+  src/     game rules for Slip / Camel O (Sandbox_engine: Game, Maze,
+           Monster, Lighting) — pure, no I/O
+  test/    expect tests for the engine
+app/
+  src/     pure application layer (Sandbox_app: Flow, Lobby, Difficulty,
+           Controls, Cutscene) — screens and presets, still no I/O
+  test/    expect tests for the app layer
+web/
+  src/     Bonsai web frontend (Sandbox_web: App, Game_canvas, the canvas
+           scene painters) — compiled to JS with js_of_ocaml
+  test/    bonsai_web_test vdom tests (run under node via (modes js))
+  bin/     the js executable + minimal index.html host page
+  serve/   native launcher: a cohttp-async static server that serves the
+           bundle; building it also builds the bundle
 lib/
   hello/
     src/     example library (Sandbox_hello.Hello)
@@ -162,3 +177,19 @@ lib/
 bin/
   main.ml    example executable
 ```
+
+## Running the game
+
+```sh
+dune exec web/serve/serve.exe          # then open http://localhost:8080/
+dune exec web/serve/serve.exe -- -port 9000   # pick another port
+```
+
+That one command builds the js bundle and serves it — the launcher depends
+on the bundle, so no separate `dune build web` is needed. It binds all
+interfaces, so an SSH'd-in browser can reach it too. Or, without the
+server, `dune build web` then open `_build/default/web/bin/index.html`
+directly (`file://` works; it just needs a network for the web font).
+
+The game (Camel O) is web-only: `web/bin/main.ml` starts the Bonsai app,
+which binds to the `#app` element of the host page.

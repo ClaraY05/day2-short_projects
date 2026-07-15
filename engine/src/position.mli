@@ -17,6 +17,6 @@ include Comparable.S_plain with type t := t
 val create : row:int -> col:int -> t
 
 (** [distance_squared a b] is the squared Euclidean distance between two
-    cells. {!Viewport} uses it for the circular light mask, e.g.
+    cells, handy for circular masks, e.g.
     [distance_squared a b <= radius * radius]. *)
 val distance_squared : t -> t -> int

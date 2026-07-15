@@ -1,8 +1,8 @@
 (** A compass direction the player (or a monster) can face.
 
-    [North] is "up" on the unrotated grid, i.e. decreasing row. The player
-    only ever moves in the direction they face; {!Viewport} rotates the world
-    so the facing direction is always drawn pointing up. *)
+    [North] is "up" on the grid, i.e. decreasing row. The map never rotates:
+    facing only decides where the player moves next and where {!Lighting}
+    points the torch beam. *)
 
 open! Core
 

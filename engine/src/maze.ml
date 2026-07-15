@@ -6,6 +6,8 @@ type t =
   ; cols : int
   ; key : Position.t
   ; bananas : Set.M(Position).t
+  ; dots : Set.M(Position).t
+  ; torches : Set.M(Position).t
   }
 
 let rows t = t.rows
@@ -13,6 +15,9 @@ let cols t = t.cols
 let key t = t.key
 let bananas t = t.bananas
 let num_bananas t = Set.length t.bananas
+let dots t = t.dots
+let num_dots t = Set.length t.dots
+let torches t = t.torches
 
 let in_bounds t { Position.row; col } =
   row >= 0 && row < t.rows && col >= 0 && col < t.cols
@@ -24,6 +29,13 @@ let is_wall t ({ Position.row; col } as position) =
 
 let is_floor t position = in_bounds t position && not (is_wall t position)
 let is_banana t position = Set.mem t.bananas position
+let is_dot t position = Set.mem t.dots position
+let is_torch t position = Set.mem t.torches position
+let collect_dot t position = { t with dots = Set.remove t.dots position }
+
+let collect_torch t position =
+  { t with torches = Set.remove t.torches position }
+;;
 
 let floor_cells t =
   List.concat_map (List.range 0 t.rows) ~f:(fun row ->
@@ -177,9 +189,12 @@ let validate ~rows ~cols ~start =
         "Maze start must be strictly inside the border" (start : Position.t)]
 ;;
 
-(* Bananas may go anywhere except on one shortest start-to-key path, the
-   start and the key, which is what keeps the maze winnable. *)
-let place_bananas t ~random_state ~start ~num_bananas =
+let num_torches = 2
+
+(* Bananas and torches may go anywhere except on one shortest start-to-key
+   path, the start and the key, which is what keeps the maze winnable. Every
+   other floor cell (bar the start and the key) gets a dot. *)
+let place_items t ~random_state ~start ~num_bananas =
   match path t ~from:start ~goal:t.key ~avoid:no_avoid with
   | None ->
     raise_s
@@ -189,13 +204,25 @@ let place_bananas t ~random_state ~start ~num_bananas =
           ~key:(t.key : Position.t)]
   | Some protected_path ->
     let protected = Set.of_list (module Position) protected_path in
-    let bananas =
+    let free =
       floor_cells t
       |> List.filter ~f:(fun cell -> not (Set.mem protected cell))
       |> List.permute ~random_state
-      |> fun candidates -> List.take candidates num_bananas
     in
-    { t with bananas = Set.of_list (module Position) bananas }
+    let bananas, free = List.split_n free num_bananas in
+    let torches = List.take free num_torches in
+    let bananas = Set.of_list (module Position) bananas in
+    let torches = Set.of_list (module Position) torches in
+    let dots =
+      floor_cells t
+      |> List.filter ~f:(fun cell ->
+        (not (Position.equal cell start))
+        && (not (Position.equal cell t.key))
+        && (not (Set.mem bananas cell))
+        && not (Set.mem torches cell))
+      |> Set.of_list (module Position)
+    in
+    { t with bananas; torches; dots }
 ;;
 
 let build ~random_state ~rows ~cols ~num_bananas ~start ~key =
@@ -210,6 +237,8 @@ let build ~random_state ~rows ~cols ~num_bananas ~start ~key =
     ; cols
     ; key = Option.value key ~default:start
     ; bananas = no_avoid
+    ; dots = no_avoid
+    ; torches = no_avoid
     }
   in
   let t =
@@ -231,7 +260,7 @@ let build ~random_state ~rows ~cols ~num_bananas ~start ~key =
       let key, _ = List.random_element_exn ~random_state farthest_third in
       { t with key }
   in
-  place_bananas t ~random_state ~start ~num_bananas
+  place_items t ~random_state ~start ~num_bananas
 ;;
 
 let generate ~random_state ~rows ~cols ~num_bananas ~start =
@@ -260,6 +289,8 @@ let to_ascii t =
       then 'K'
       else if is_banana t position
       then 'b'
+      else if is_torch t position
+      then 'T'
       else '.')
     |> String.of_char_list)
   |> String.concat ~sep:"\n"
@@ -297,6 +328,7 @@ module For_testing = struct
     let walls = Array.make_matrix ~dimx:rows ~dimy:cols true in
     let keys = ref [] in
     let bananas = ref [] in
+    let torches = ref [] in
     List.iteri lines ~f:(fun row line ->
       String.iteri line ~f:(fun col char ->
         let position = Position.create ~row ~col in
@@ -309,18 +341,29 @@ module For_testing = struct
         | 'b' ->
           walls.(row).(col) <- false;
           bananas := position :: !bananas
+        | 'T' ->
+          walls.(row).(col) <- false;
+          torches := position :: !torches
         | char ->
           raise_s
             [%message
               "Maze.For_testing.of_ascii: unknown cell" (char : char)]));
     match !keys with
     | [ key ] ->
-      { walls
-      ; rows
-      ; cols
-      ; key
-      ; bananas = Set.of_list (module Position) !bananas
-      }
+      let bananas = Set.of_list (module Position) !bananas in
+      let torches = Set.of_list (module Position) !torches in
+      let t =
+        { walls; rows; cols; key; bananas; torches; dots = no_avoid }
+      in
+      let dots =
+        floor_cells t
+        |> List.filter ~f:(fun cell ->
+          (not (Position.equal cell key))
+          && (not (Set.mem bananas cell))
+          && not (Set.mem torches cell))
+        |> Set.of_list (module Position)
+      in
+      { t with dots }
     | keys ->
       raise_s
         [%message

@@ -1,3 +1,5 @@
+module Controls = Controls
 module Cutscene = Cutscene
-module Game_loop = Game_loop
-module Render = Render
+module Difficulty = Difficulty
+module Flow = Flow
+module Lobby = Lobby

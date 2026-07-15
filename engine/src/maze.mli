@@ -1,8 +1,9 @@
-(** Maze grid: walls, one key, and slippery bananas.
+(** Maze grid: walls, one key, slippery bananas, score dots and torches.
 
     A maze is a fixed-size grid of wall and floor cells with a border of
-    walls, a single key cell, and a set of banana cells. Generation
-    guarantees, by construction:
+    walls, a single key cell, a set of banana cells, a couple of torch cells
+    and a dot on every remaining floor cell. Generation guarantees, by
+    construction:
 
     - every floor cell is reachable from every other floor cell;
     - the player's cell and the key cell are floor;
@@ -55,6 +56,18 @@ val cols : t -> int
 val key : t -> Position.t
 val bananas : t -> Set.M(Position).t
 val num_bananas : t -> int
+
+(** Collectible score pellets: one on every floor cell that is not the start,
+    the key, a banana or a torch. {!Game} removes them with {!collect_dot} as
+    the player walks. *)
+val dots : t -> Set.M(Position).t
+
+val num_dots : t -> int
+
+(** Torch pickups (two per maze) that {!Game} turns into a temporary light
+    boost. *)
+val torches : t -> Set.M(Position).t
+
 val in_bounds : t -> Position.t -> bool
 
 (** [is_wall t position] is true for wall cells and for out-of-bounds
@@ -65,6 +78,14 @@ val is_wall : t -> Position.t -> bool
 val is_floor : t -> Position.t -> bool
 
 val is_banana : t -> Position.t -> bool
+val is_dot : t -> Position.t -> bool
+val is_torch : t -> Position.t -> bool
+
+(** [collect_dot t position] is [t] without the dot at [position] (a no-op if
+    there is none there); [collect_torch] likewise for torches. *)
+val collect_dot : t -> Position.t -> t
+
+val collect_torch : t -> Position.t -> t
 
 (** All floor cells, in no particular order. Handy for spawning things; see
     {!Game}. *)
@@ -92,11 +113,13 @@ module For_testing : sig
 
   val banana_free_path_exists : t -> from:Position.t -> bool
 
-  (** Renders the grid with ['#'] walls, ['.'] floor, ['K'] key and ['b']
-      bananas, one row per line. *)
+  (** Renders the grid with ['#'] walls, ['.'] floor, ['K'] key, ['b']
+      bananas and ['T'] torches, one row per line. Dots are not rendered:
+      they sit on almost every floor cell and would drown the picture. *)
   val to_ascii : t -> string
 
   (** Parses the format produced by {!to_ascii}. Raises if rows are ragged or
-      there is not exactly one ['K']. *)
+      there is not exactly one ['K']. Every floor cell that is not the key, a
+      banana or a torch gets a dot. *)
   val of_ascii : string -> t
 end

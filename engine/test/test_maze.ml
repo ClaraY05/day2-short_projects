@@ -19,11 +19,11 @@ let%expect_test "a generated maze, drawn" =
     #.###.#..####.###...###.#
     #.#...#...#.b.#.....#...#
     #.#.#...#.#.b##.#####.###
-    #.#.#...#.#.#.#.....#...#
+    #.#.#...#.#.#.#.....#T..#
     #.####....#.#.#####.###.#
     #b......#...#.#.........#
     #############...#####.#.#
-    #.........#...#...#...#.#
+    #.........#...#...#...#T#
     #...####..#.#.###.#.###.#
     #.#...#...#.#.....#...#.#
     #.###...#.#.#########.#.#
@@ -44,6 +44,24 @@ let%expect_test "generation invariants hold across many seeds" =
     check "five bananas" (Maze.num_bananas maze = 5);
     check "no banana on the start" (not (Maze.is_banana maze start));
     check "no banana on the key" (not (Maze.is_banana maze (Maze.key maze)));
+    check "two torches" (Set.length (Maze.torches maze) = 2);
+    check "no torch on the start" (not (Maze.is_torch maze start));
+    check "no torch on the key" (not (Maze.is_torch maze (Maze.key maze)));
+    check
+      "dots fill the remaining floor"
+      (Maze.num_dots maze
+       = List.length (Maze.floor_cells maze)
+         - 2 (* start and key *)
+         - Maze.num_bananas maze
+         - Set.length (Maze.torches maze));
+    check
+      "dots avoid every feature"
+      (Set.for_all (Maze.dots maze) ~f:(fun dot ->
+         Maze.is_floor maze dot
+         && (not (Maze.is_banana maze dot))
+         && (not (Maze.is_torch maze dot))
+         && (not (Position.equal dot start))
+         && not (Position.equal dot (Maze.key maze))));
     check
       "winnable"
       (Maze.For_testing.banana_free_path_exists maze ~from:start));
@@ -104,6 +122,32 @@ let%expect_test "of_ascii round-trips and reads features" =
         ~key:(Maze.key maze : Position.t)
         ~bananas:(Set.to_list (Maze.bananas maze) : Position.t list)];
   [%expect {| ((key ((row 1) (col 1))) (bananas (((row 1) (col 3))))) |}]
+;;
+
+let%expect_test "collecting a dot or torch removes just that cell" =
+  let maze = Maze.For_testing.of_ascii {|#####
+#K.T#
+#.#.#
+#..b#
+#####|} in
+  let dot = Position.create ~row:2 ~col:1 in
+  let torch = Position.create ~row:1 ~col:3 in
+  let collected = Maze.collect_dot maze dot in
+  let collected = Maze.collect_torch collected torch in
+  print_s
+    [%message
+      ""
+        ~dots_before:(Maze.num_dots maze : int)
+        ~dots_after:(Maze.num_dots collected : int)
+        ~dot_gone:(not (Maze.is_dot collected dot) : bool)
+        ~torch_gone:(not (Maze.is_torch collected torch) : bool)
+        ~others_untouched:
+          (Maze.is_dot collected (Position.create ~row:3 ~col:1) : bool)];
+  [%expect
+    {|
+    ((dots_before 5) (dots_after 4) (dot_gone true) (torch_gone true)
+     (others_untouched true))
+    |}]
 ;;
 
 let%expect_test "dimensions must be odd and at least 5" =

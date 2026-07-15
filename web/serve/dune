@@ -1,0 +1,25 @@
+(executable
+ (name serve)
+ (libraries core core_unix.command_unix async cohttp-async)
+ (preprocess
+  (pps ppx_jane)))
+
+; Copy the compiled game next to the launcher so it can serve the two files
+; from its own directory regardless of the working directory.
+
+(rule
+ (copy ../bin/index.html index.html))
+
+(rule
+ (copy ../bin/main.bc.js main.bc.js))
+
+; A throwaway module the launcher depends on, so building the launcher also
+; builds (and copies) the js bundle: one [dune exec] does everything.
+
+(rule
+ (target bundle_ready.ml)
+ (deps index.html main.bc.js)
+ (action
+  (with-stdout-to
+   bundle_ready.ml
+   (echo "let () = () (* forces the web bundle to build and copy *)\n"))))
