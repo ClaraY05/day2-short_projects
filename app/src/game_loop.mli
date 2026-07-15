@@ -10,3 +10,8 @@
 open! Core
 
 val run : unit -> unit
+
+(** Like {!run}, but paints with {!Render.render_map}: the whole maze is
+    visible at once, fixed and unrotated, so you can watch it regenerate.
+    Same keys, same rules — a debug front end, not the real game. *)
+val run_map : unit -> unit

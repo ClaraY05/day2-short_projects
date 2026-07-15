@@ -26,9 +26,9 @@ let wants_to_leave game key =
   || (Game.Phase.equal (Game.phase game) Start_screen && Char.equal key 'q')
 ;;
 
-let rec loop game =
+let rec loop ~render game =
   print_string clear_screen;
-  print_string (Render.render game);
+  print_string (render game);
   Out_channel.flush stdout;
   match In_channel.input_char In_channel.stdin with
   | None -> ()
@@ -37,8 +37,8 @@ let rec loop game =
     then ()
     else (
       match action_of_key game key with
-      | None -> loop game
-      | Some action -> loop (Game.handle_action game action))
+      | None -> loop ~render game
+      | Some action -> loop ~render (Game.handle_action game action))
 ;;
 
 (* Raw-ish mode: no line buffering, no echo, and no signal keys so that
@@ -60,7 +60,7 @@ let with_raw_terminal f =
     Core_unix.Terminal_io.tcsetattr original fd ~mode:TCSANOW)
 ;;
 
-let run () =
+let run_with ~render =
   if not (Core_unix.isatty Core_unix.stdin)
   then
     print_endline
@@ -70,9 +70,12 @@ let run () =
     let game = Game.create ~random_state () in
     print_string hide_cursor;
     Exn.protect
-      ~f:(fun () -> with_raw_terminal (fun () -> loop game))
+      ~f:(fun () -> with_raw_terminal (fun () -> loop ~render game))
       ~finally:(fun () ->
         print_string show_cursor;
         print_string clear_screen;
         Out_channel.flush stdout))
 ;;
+
+let run () = run_with ~render:(fun game -> Render.render game)
+let run_map () = run_with ~render:(fun game -> Render.render_map game)

@@ -19,6 +19,19 @@ let tile_glyph ~ansi (tile : Viewport.Tile.t option) =
   | Some Monster -> color ~ansi "1;91" "M "
 ;;
 
+(* In the map view the world is not rotated, so the player's glyph carries
+   the direction they face instead of always pointing up. *)
+let player_glyph ~ansi (facing : Direction.t) =
+  let arrow =
+    match facing with
+    | North -> "^ "
+    | South -> "v "
+    | East -> "> "
+    | West -> "< "
+  in
+  color ~ansi "1;96" arrow
+;;
+
 let strip_trailing_spaces text =
   String.split_lines text
   |> List.map ~f:String.rstrip
@@ -61,6 +74,46 @@ let playing_screen ~ansi game =
   let bananas = Game.bananas_remaining_exn game in
   let header =
     color ~ansi "2" [%string "bananas underfoot: %{bananas#Int}"]
+  in
+  let footer =
+    color
+      ~ansi
+      "2"
+      "[w] forward   [a]/[d] turn   [s] about-face   [q] give up"
+  in
+  [%string {|
+   %{header}
+
+%{grid}
+
+   %{footer}
+|}]
+;;
+
+let map_screen ~ansi game =
+  let player = Game.player_exn game in
+  let facing = Game.facing_exn game in
+  let view =
+    Viewport.full_map
+      ~maze:(Game.maze_exn game)
+      ~player
+      ~monster:(Some (Monster.position (Game.monster_exn game)))
+  in
+  let grid =
+    Array.to_list view
+    |> List.mapi ~f:(fun row cells ->
+      "   "
+      ^ (Array.to_list cells
+         |> List.mapi ~f:(fun col tile ->
+           if row = player.Position.row && col = player.Position.col
+           then player_glyph ~ansi facing
+           else tile_glyph ~ansi tile)
+         |> String.concat))
+    |> String.concat ~sep:"\n"
+  in
+  let bananas = Game.bananas_remaining_exn game in
+  let header =
+    color ~ansi "2" [%string "map view — bananas underfoot: %{bananas#Int}"]
   in
   let footer =
     color
@@ -122,6 +175,15 @@ let render ?(ansi = true) game =
   (match Game.phase game with
    | Start_screen -> start_screen ~ansi
    | Playing -> playing_screen ~ansi game
+   | Won -> won_screen ~ansi
+   | Lost -> lost_screen ~ansi game)
+  |> strip_trailing_spaces
+;;
+
+let render_map ?(ansi = true) game =
+  (match Game.phase game with
+   | Start_screen -> start_screen ~ansi
+   | Playing -> map_screen ~ansi game
    | Won -> won_screen ~ansi
    | Lost -> lost_screen ~ansi game)
   |> strip_trailing_spaces

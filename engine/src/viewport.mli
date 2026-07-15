@@ -41,3 +41,14 @@ val view
   -> monster:Position.t option
   -> radius:int
   -> Tile.t option array array
+
+(** [full_map ~maze ~player ~monster] is the whole grid drawn from above with
+    no rotation and no light mask: row [0] is the top of the maze, every cell
+    is a [Some], and nothing is hidden. Unlike {!view} this ignores which way
+    the player faces. The map-view executable (see [sandbox.app]) uses it to
+    watch the maze regenerate; the real game uses {!view}. *)
+val full_map
+  :  maze:Maze.t
+  -> player:Position.t
+  -> monster:Position.t option
+  -> Tile.t option array array

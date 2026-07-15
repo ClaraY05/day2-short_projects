@@ -127,3 +127,28 @@ let%expect_test "the monster shows up only inside the light" =
     |  .  |
     |}]
 ;;
+
+let print_full_map ~player ~monster =
+  Viewport.full_map ~maze ~player ~monster
+  |> Array.iter ~f:(fun row ->
+    let cells =
+      Array.to_list row |> List.map ~f:(fun t -> String.of_char (glyph t))
+    in
+    print_endline (String.concat cells))
+;;
+
+let%expect_test "the full map hides nothing and never rotates" =
+  print_full_map
+    ~player:center
+    ~monster:(Some (Position.create ~row:5 ~col:5));
+  [%expect
+    {|
+    #######
+    #K....#
+    #.###.#
+    #b@.#.#
+    ###.#.#
+    #....M#
+    #######
+    |}]
+;;

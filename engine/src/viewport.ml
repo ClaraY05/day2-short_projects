@@ -57,3 +57,28 @@ let view ~maze ~player ~facing ~monster ~radius =
         then Some Tile.Wall
         else Some Tile.Floor)))
 ;;
+
+let tile_at ~maze ~player ~monster position =
+  let monster_here =
+    match monster with
+    | Some monster -> Position.equal monster position
+    | None -> false
+  in
+  if Position.equal position player
+  then Some Tile.Player
+  else if monster_here
+  then Some Tile.Monster
+  else if Position.equal position (Maze.key maze)
+  then Some Tile.Key
+  else if Maze.is_banana maze position
+  then Some Tile.Banana
+  else if Maze.is_wall maze position
+  then Some Tile.Wall
+  else Some Tile.Floor
+;;
+
+let full_map ~maze ~player ~monster =
+  Array.init (Maze.rows maze) ~f:(fun row ->
+    Array.init (Maze.cols maze) ~f:(fun col ->
+      tile_at ~maze ~player ~monster (Position.create ~row ~col)))
+;;
