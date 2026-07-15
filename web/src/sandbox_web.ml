@@ -1,4 +1,5 @@
 module App = App
+module Audio = Audio
 module Canvas2d = Canvas2d
 module Cutscene_scene = Cutscene_scene
 module Game_canvas = Game_canvas

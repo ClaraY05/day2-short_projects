@@ -8,10 +8,13 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx)))
 
-; Keep the host page next to the compiled bundle so
+; Keep the host page and the audio next to the compiled bundle so
 ; _build/default/web/bin/index.html can be opened directly.
+
+(copy_files
+ (files ../../assets/*.mp3))
 
 (rule
  (alias default)
- (deps main.bc.js index.html)
+ (deps main.bc.js index.html (glob_files *.mp3))
  (action (progn)))

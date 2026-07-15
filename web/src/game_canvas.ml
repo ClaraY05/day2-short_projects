@@ -130,6 +130,11 @@ module State = struct
     ; mutable prev_screen : Flow.Screen.t
     ; mutable player : Glide.t option
     ; mutable monster : Glide.t option
+    ; (* Baselines for the item-pickup cue: a rise in either while playing is
+         a dot or torch collected. Reset on each entry into [Playing] so a
+         finished run's score and a post-slip maze never re-trigger. *)
+      mutable last_score : int
+    ; mutable last_torch_ticks : int
     ; mutable last_view_model : View_model.t option
     ; scatter : Lobby_scene.scatter
     ; support : Cutscene_scene.support
@@ -179,6 +184,13 @@ let playing_move_direction (state : State.t) =
   | Start_screen | Won | Lost -> None
 ;;
 
+(* Lobby has its own bed; the dunes and every cutscene (and the end screens
+   they lead into) share the gameplay bed. *)
+let music_for_screen : Flow.Screen.t -> Audio.Music.t = function
+  | Lobby -> Lobby
+  | Playing | Cutscene _ | Won | Lost -> Gameplay
+;;
+
 let on_screen_change (state : State.t) (screen : Flow.Screen.t) =
   (match screen with
    | Lobby ->
@@ -191,12 +203,31 @@ let on_screen_change (state : State.t) (screen : Flow.Screen.t) =
      let game = Flow.game state.flow in
      state.player <- Some (Glide.create (Game.player_exn game));
      state.monster
-     <- Some (Glide.create (Monster.position (Game.monster_exn game)))
-   | Cutscene (_ : Cutscene.Event.t) ->
+     <- Some (Glide.create (Monster.position (Game.monster_exn game)));
+     state.last_score <- Game.score game;
+     state.last_torch_ticks <- Game.torch_ticks_exn game
+   | Cutscene event ->
      state.cutscene_started_ms <- None;
-     state.cutscene_finish_applied <- false
+     state.cutscene_finish_applied <- false;
+     (match event with
+      | Banana_slip -> Audio.play_effect Banana_slip
+      | Jumpscare -> Audio.play_effect Game_over
+      | Finding_o -> ())
    | Won | Lost -> ());
   state.prev_screen <- screen
+;;
+
+(* A dot (score) or torch (light ticks) collected this frame. Runs only while
+   playing, where [torch_ticks_exn] is valid; the baselines are re-seeded on
+   every entry into [Playing] so nothing here fires spuriously. *)
+let detect_pickup (state : State.t) =
+  let game = Flow.game state.flow in
+  let score = Game.score game in
+  let torch_ticks = Game.torch_ticks_exn game in
+  if score > state.last_score || torch_ticks > state.last_torch_ticks
+  then Audio.play_effect Item_pickup;
+  state.last_score <- score;
+  state.last_torch_ticks <- torch_ticks
 ;;
 
 let advance_lobby (state : State.t) ~dt =
@@ -341,7 +372,13 @@ let draw_frame (state : State.t) ~now_ms =
   let screen = Flow.screen state.flow in
   if not (Flow.Screen.equal screen state.prev_screen)
   then on_screen_change state screen;
-  (* 4. mirror to the Bonsai chrome, then draw. *)
+  (* 4. keep the right bed looping (idempotent; also starts the opening
+     lobby music, which no transition announces) and sound any pickup. *)
+  Audio.play_music (music_for_screen screen);
+  (match screen with
+   | Playing -> detect_pickup state
+   | Lobby | Cutscene _ | Won | Lost -> ());
+  (* 5. mirror to the Bonsai chrome, then draw. *)
   push_view_model state;
   match screen with
   | Lobby -> render_lobby state ~now_ms
@@ -404,6 +441,8 @@ module Widget = struct
       ; prev_screen = Flow.screen flow
       ; player = None
       ; monster = None
+      ; last_score = 0
+      ; last_torch_ticks = 0
       ; last_view_model = None
       ; scatter = Lobby_scene.scatter ~random_state
       ; support = Cutscene_scene.support ~random_state
