@@ -12,6 +12,9 @@ module Direction = Direction
 (** The state machine: start screen, playing, won, lost. *)
 module Game = Game
 
+(** What the player is carrying, such as picked-up torches. *)
+module Inventory = Inventory
+
 (** Grid generation with a guaranteed banana-free path to the key. *)
 module Maze = Maze
 
@@ -23,6 +26,9 @@ module Monster_intf = Monster_intf
 
 (** Grid coordinates. *)
 module Position = Position
+
+(** A pickable torch that rests on a maze cell. *)
+module Torch = Torch
 
 (** The player's rotated, light-limited point of view. *)
 module Viewport = Viewport
