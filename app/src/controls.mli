@@ -19,3 +19,9 @@ type intent =
 (** [intent_of_key key] reads a DOM [KeyboardEvent.key] value
     (case-insensitive), e.g. ["w"], ["ArrowUp"], ["Enter"], [" "]. *)
 val intent_of_key : string -> intent option
+
+(** [difficulty_of_key key] reads a number-row [KeyboardEvent.key] (["1"],
+    ["2"], ["3"], ...) as a pick from {!Sandbox_app.Difficulty.all} by
+    position — ["1"] is the first preset. The lobby's difficulty book listens
+    for these. *)
+val difficulty_of_key : string -> Difficulty.t option

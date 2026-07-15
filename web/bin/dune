@@ -16,5 +16,8 @@
 
 (rule
  (alias default)
- (deps main.bc.js index.html (glob_files *.mp3))
+ (deps
+  main.bc.js
+  index.html
+  (glob_files *.mp3))
  (action (progn)))

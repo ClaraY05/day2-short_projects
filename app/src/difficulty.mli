@@ -22,6 +22,12 @@ type t =
 (** The design's default. *)
 val default : t
 
+(** Uppercase screen name for the lobby's difficulty book, e.g. ["NORMAL"]. *)
+val label : t -> string
+
+(** One-line flavor text for the lobby's difficulty book. *)
+val blurb : t -> string
+
 type config =
   { rows : int
   (** maze height in cells; odd, see {!Sandbox_engine.Maze.generate} *)

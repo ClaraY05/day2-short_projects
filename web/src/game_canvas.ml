@@ -26,6 +26,7 @@ module View_model = struct
     ; slips : int
     ; lobby_zone : int
     ; can_enter : bool
+    ; difficulty : Difficulty.t
     }
   [@@deriving sexp_of, equal]
 
@@ -35,13 +36,14 @@ module View_model = struct
     ; slips = 0
     ; lobby_zone = 0
     ; can_enter = false
+    ; difficulty = Difficulty.default
     }
   ;;
 end
 
 module Input = struct
   type t =
-    { config : Difficulty.config
+    { difficulty : Difficulty.t ref
     ; random_state : Random.State.t
     ; held : Direction.t list ref
     ; commands : Command.t list ref
@@ -121,6 +123,8 @@ module State = struct
     ; ctx : Canvas2d.t
     ; mutable input : Input.t
     ; mutable flow : Flow.t (* the authoritative game *)
+    ; mutable config : Difficulty.config
+        (* the running difficulty's preset *)
     ; mutable raf : Dom_html.animation_frame_request_id option
     ; mutable last_frame_ms : float option
     ; mutable lobby : Lobby.t
@@ -148,9 +152,27 @@ end
    the effect is enqueued and applied on Bonsai's own next frame. *)
 let dispatch effect = Vdom.Effect.Expert.handle_non_dom_event_exn effect
 
-let apply_command flow (command : Command.t) =
+(* Begin a run at the difficulty currently chosen in the lobby book. We build
+   a brand-new game rather than restarting the old one, which is what lets a
+   difficulty change actually take effect on the next run; [state.config] is
+   updated so the per-frame monster speed and torch beam match. *)
+let start_selected_run (state : State.t) =
+  state.config <- Difficulty.config !(state.input.difficulty);
+  Flow.start_run
+    (Flow.create
+       ~config:state.config
+       ~random_state:state.input.random_state
+       ())
+;;
+
+let apply_command (state : State.t) flow (command : Command.t) =
   match command with
-  | Start_run -> Flow.start_run flow
+  | Start_run ->
+    (match Flow.screen flow with
+     (* Already running (or mid-cutscene): a stray Start_run is a no-op, as
+        the old flow-level guard was. *)
+     | Playing | Cutscene _ -> flow
+     | Lobby | Won | Lost -> start_selected_run state)
   | Quit -> Flow.quit flow
 ;;
 
@@ -161,7 +183,7 @@ let drain_commands (state : State.t) =
     state.input.commands := [];
     (* [pending] is most-recent-first; apply in the order pressed. *)
     state.flow
-    <- List.fold (List.rev pending) ~init:state.flow ~f:apply_command
+    <- List.fold (List.rev pending) ~init:state.flow ~f:(apply_command state)
 ;;
 
 let held_horizontal (state : State.t) =
@@ -237,7 +259,7 @@ let advance_lobby (state : State.t) ~dt =
      && List.mem !(state.input.held) North ~equal:Direction.equal
   then (
     state.entered_dunes <- true;
-    state.flow <- Flow.start_run state.flow)
+    state.flow <- start_selected_run state)
 ;;
 
 let advance_playing (state : State.t) ~dt =
@@ -250,7 +272,7 @@ let advance_playing (state : State.t) ~dt =
     Glide.advance
       monster
       ~dt
-      ~speed:state.input.config.Difficulty.monster_cells_per_second;
+      ~speed:state.config.Difficulty.monster_cells_per_second;
     (* Continuous movement: the instant the glide settles, take the next held
        step so the trader flows through corridors without stopping. *)
     if not (Glide.is_moving player)
@@ -291,6 +313,7 @@ let current_view_model (state : State.t) : View_model.t =
   ; slips = Game.slips game
   ; lobby_zone = Lobby.zone state.lobby
   ; can_enter = Lobby.can_enter state.lobby
+  ; difficulty = !(state.input.difficulty)
   }
 ;;
 
@@ -317,7 +340,7 @@ let render_playing (state : State.t) ~now_ms =
   match Game.phase game, state.player, state.monster with
   | Playing, Some player, Some monster ->
     let torch_lit = Game.torch_ticks_exn game > 0 in
-    let config = state.input.config in
+    let config = state.config in
     let cone_degrees =
       config.Difficulty.cone_degrees
       +. if torch_lit then Difficulty.torch_cone_bonus_degrees else 0.
@@ -372,8 +395,8 @@ let draw_frame (state : State.t) ~now_ms =
   let screen = Flow.screen state.flow in
   if not (Flow.Screen.equal screen state.prev_screen)
   then on_screen_change state screen;
-  (* 4. keep the right bed looping (idempotent; also starts the opening
-     lobby music, which no transition announces) and sound any pickup. *)
+  (* 4. keep the right bed looping (idempotent; also starts the opening lobby
+     music, which no transition announces) and sound any pickup. *)
   Audio.play_music (music_for_screen screen);
   (match screen with
    | Playing -> detect_pickup state
@@ -424,14 +447,14 @@ module Widget = struct
     (* Rendering jitter uses a throwaway generator so it never perturbs the
        game's own maze RNG (which lives inside the flow). *)
     let random_state = Random.State.default in
-    let flow =
-      Flow.create ~config:input.config ~random_state:input.random_state ()
-    in
+    let config = Difficulty.config !(input.difficulty) in
+    let flow = Flow.create ~config ~random_state:input.random_state () in
     let state =
       { State.canvas
       ; ctx = Canvas2d.context canvas
       ; input
       ; flow
+      ; config
       ; raf = None
       ; last_frame_ms = None
       ; lobby = Lobby.create ()

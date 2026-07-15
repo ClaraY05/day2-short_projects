@@ -16,8 +16,10 @@
     desired track is remembered and started then.
 
     {[
-      Audio.play_music Lobby;   (* remembered; starts once unlocked *)
-      Audio.unlock ();          (* call from the first keydown *)
+      Audio.play_music Lobby;
+      (* remembered; starts once unlocked *)
+      Audio.unlock ();
+      (* call from the first keydown *)
       Audio.play_effect Item_pickup
     ]} *)
 

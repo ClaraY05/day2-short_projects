@@ -30,14 +30,16 @@ end
 
 module View_model : sig
   (** The slice of game state the Bonsai chrome renders: which screen shows,
-      the HUD counters, and the lobby caption's dialogue zone and dune gate.
-      The widget pushes a fresh one whenever it changes. *)
+      the HUD counters, the lobby caption's dialogue zone and dune gate, and
+      the difficulty selected in the lobby book. The widget pushes a fresh
+      one whenever it changes. *)
   type t =
     { screen : Flow.Screen.t
     ; score : int
     ; slips : int
     ; lobby_zone : int
     ; can_enter : bool
+    ; difficulty : Difficulty.t
     }
   [@@deriving sexp_of, equal]
 
@@ -47,12 +49,14 @@ module View_model : sig
 end
 
 module Input : sig
-  (** [held] and [commands] are refs shared with {!App}: its key handlers and
-      buttons write them, the widget reads and drains them each frame — the
-      low-latency channel that bypasses Bonsai stabilization. [config] and
-      [random_state] seed the game; [set_view_model] pushes the mirror. *)
+  (** [held], [commands] and [difficulty] are refs shared with {!App}: its
+      key handlers and buttons write them, the widget reads and drains them
+      each frame — the low-latency channel that bypasses Bonsai
+      stabilization. The lobby's number keys set [difficulty], and the widget
+      reads it whenever a run starts. [random_state] seeds the game;
+      [set_view_model] pushes the mirror. *)
   type t =
-    { config : Difficulty.config
+    { difficulty : Difficulty.t ref
     ; random_state : Random.State.t
     ; held : Direction.t list ref
     ; commands : Command.t list ref

@@ -167,6 +167,84 @@ let caption_hint =
     ]
 ;;
 
+(* The lobby's difficulty book: a small ledger pinned to the top-left of the
+   console, keyboard-driven so it takes no pointer events. *)
+
+let book_area =
+  style
+    [ "position:absolute"
+    ; "top:16px"
+    ; "left:16px"
+    ; "width:210px"
+    ; "pointer-events:none"
+    ]
+;;
+
+let book_panel =
+  style
+    [ "background:linear-gradient(180deg,rgba(12,7,3,.9),rgba(6,3,1,.95))"
+    ; [%string "border:2px solid %{Palette.wall}"]
+    ; "border-radius:7px"
+    ; "padding:12px 13px 11px"
+    ; "box-shadow:0 8px 30px rgba(0,0,0,.5)"
+    ]
+;;
+
+let book_title =
+  style
+    [ "color:#ff9d2f"
+    ; "font-size:9px"
+    ; "letter-spacing:1px"
+    ; "text-shadow:1px 1px 0 #000"
+    ; "margin-bottom:11px"
+    ]
+;;
+
+let book_rows = style [ "display:flex"; "flex-direction:column"; "gap:7px" ]
+
+let book_row ~is_selected =
+  style
+    [ "display:flex"
+    ; "align-items:center"
+    ; "gap:9px"
+    ; "padding:5px 6px"
+    ; "border-radius:4px"
+    ; ("border-left:3px solid "
+       ^ if is_selected then Palette.wall else "transparent")
+    ; ("background:"
+       ^ if is_selected then "rgba(217,122,30,.16)" else "transparent")
+    ]
+;;
+
+let book_slot ~is_selected =
+  style
+    [ "flex:none"
+    ; "width:16px"
+    ; "text-align:center"
+    ; "font-size:10px"
+    ; ("color:" ^ if is_selected then Palette.banana else "#8a6a3a")
+    ]
+;;
+
+let book_label ~is_selected =
+  style
+    [ "font-size:10px"
+    ; "letter-spacing:1px"
+    ; "text-shadow:1px 1px 0 #000"
+    ; ("color:" ^ if is_selected then Palette.camel else "#8a6a3a")
+    ]
+;;
+
+let book_hint =
+  style
+    [ "color:#8a6a3a"
+    ; "font-size:8px"
+    ; "letter-spacing:1px"
+    ; "line-height:1.7"
+    ; "margin-top:11px"
+    ]
+;;
+
 let overlay ~backdrop =
   style
     [ "position:absolute"

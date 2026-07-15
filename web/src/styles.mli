@@ -43,6 +43,21 @@ val caption_box : Vdom.Attr.t
 val caption_text : Vdom.Attr.t
 val caption_hint : Vdom.Attr.t
 
+(** Lobby difficulty book *)
+
+val book_area : Vdom.Attr.t
+val book_panel : Vdom.Attr.t
+val book_title : Vdom.Attr.t
+val book_rows : Vdom.Attr.t
+
+(** [book_row], [book_slot] and [book_label] brighten when [is_selected] to
+    mark the chosen preset. *)
+val book_row : is_selected:bool -> Vdom.Attr.t
+
+val book_slot : is_selected:bool -> Vdom.Attr.t
+val book_label : is_selected:bool -> Vdom.Attr.t
+val book_hint : Vdom.Attr.t
+
 (** End screens *)
 
 val overlay_won : Vdom.Attr.t

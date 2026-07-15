@@ -29,13 +29,38 @@ let%expect_test "the app opens on the lobby: chrome, canvas and caption box" =
           <div> </div>
           <div>
             <div>
-              <span> TRADER </span>
+              <div>
+                <div> ◈ CHOOSE YOUR TRIAL </div>
+                <div>
+                  <div>
+                    <span> 1 </span>
+                    <span> EASY </span>
+                  </div>
+                  <div>
+                    <span> 2 </span>
+                    <span> NORMAL </span>
+                  </div>
+                  <div>
+                    <span> 3 </span>
+                    <span> NIGHTMARE </span>
+                  </div>
+                </div>
+                <div> the dunes as intended </div>
+                <div> PRESS 1 · 2 · 3 </div>
+              </div>
             </div>
             <div>
               <div>
-                Camp's gone quiet without you, O. You slipped your rope before sunrise and wandered off into the dark.
+                <span> TRADER </span>
               </div>
-              <div>  ◂ ▸ / A D  walk the camp  ·  ▲ W  enter the dunes at the gap  </div>
+              <div>
+                <div>
+                  Camp's gone quiet without you, O. You slipped your rope before sunrise and wandered off into the dark.
+                </div>
+                <div>
+                   ◂ ▸ / A D  walk the camp  ·  ▲ W  enter the dunes at the gap
+                </div>
+              </div>
             </div>
           </div>
         </div>

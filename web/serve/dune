@@ -25,7 +25,10 @@
 
 (rule
  (target bundle_ready.ml)
- (deps index.html main.bc.js (glob_files *.mp3))
+ (deps
+  index.html
+  main.bc.js
+  (glob_files *.mp3))
  (action
   (with-stdout-to
    bundle_ready.ml
