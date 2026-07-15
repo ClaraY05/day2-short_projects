@@ -1,0 +1,6 @@
+(library
+ (name sandbox_items)
+ (public_name sandbox.items)
+ (libraries core sandbox_engine)
+ (preprocess
+  (pps ppx_jane)))
