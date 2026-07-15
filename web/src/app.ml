@@ -184,7 +184,11 @@ let lost_overlay ~retry ~quit =
   |}
 ;;
 
-let component ?(difficulty = Difficulty.default) ~random_state (local_ graph)
+let component
+  ?(difficulty = Difficulty.default)
+  ?(map_view = false)
+  ~random_state
+  (local_ graph)
   =
   let held : Direction.t list ref = ref [] in
   let commands : Command.t list ref = ref [] in
@@ -214,7 +218,13 @@ let component ?(difficulty = Difficulty.default) ~random_state (local_ graph)
   in
   let canvas =
     Game_canvas.node
-      { difficulty; random_state; held; commands; set_view_model }
+      { difficulty
+      ; random_state
+      ; reveal_all = map_view
+      ; held
+      ; commands
+      ; set_view_model
+      }
   in
   let keyboard =
     [ Vdom.Attr.Global_listeners.keydown

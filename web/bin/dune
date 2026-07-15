@@ -1,5 +1,8 @@
-(executable
- (name main)
+; The game ([main]) and its whole-maze debug view ([map_view]) are two js
+; entry points onto the same {!Sandbox_web.App}.
+
+(executables
+ (names main map_view)
  (modes js)
  (js_of_ocaml
   (flags
@@ -8,8 +11,9 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx)))
 
-; Keep the host page and the audio next to the compiled bundle so
-; _build/default/web/bin/index.html can be opened directly.
+; Keep the host pages and the audio next to the compiled bundles so
+; _build/default/web/bin/index.html (and map_view.html) can be opened
+; directly.
 
 (copy_files
  (files ../../assets/*.mp3))
@@ -19,5 +23,7 @@
  (deps
   main.bc.js
   index.html
+  map_view.bc.js
+  map_view.html
   (glob_files *.mp3))
  (action (progn)))

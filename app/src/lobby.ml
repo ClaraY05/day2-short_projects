@@ -15,6 +15,12 @@ let entrance_x = 1740.
 let walk_speed = 185.
 let edge_margin = 120.
 let enter_threshold = 1650.
+
+(* The trader stops at the campfire the same way he stops at the gap: he may
+   not walk onto it. [campfire_x] mirrors the fire the painter sets left of
+   the tent; [left_limit] leaves his feet just clear of the flames. *)
+let campfire_x = camp_x -. 74.
+let left_limit = campfire_x +. 46.
 let create () = { x = camp_x; facing = East; is_walking = false }
 
 let step t ~dt ~held =
@@ -32,7 +38,7 @@ let step t ~dt ~held =
   let x =
     Float.clamp_exn
       (t.x +. (velocity *. dt))
-      ~min:edge_margin
+      ~min:left_limit
       ~max:(world_width -. edge_margin)
   in
   { x; facing; is_walking = Float.( <> ) velocity 0. }

@@ -37,6 +37,10 @@ let collect_torch t position =
   { t with torches = Set.remove t.torches position }
 ;;
 
+let collect_banana t position =
+  { t with bananas = Set.remove t.bananas position }
+;;
+
 let floor_cells t =
   List.concat_map (List.range 0 t.rows) ~f:(fun row ->
     List.filter_map (List.range 0 t.cols) ~f:(fun col ->
