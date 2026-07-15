@@ -4,26 +4,11 @@ open Bonsai_web
 open Bonsai.Let_syntax
 open Sandbox_engine
 open Sandbox_app
+module Command = Game_canvas.Command
+module View_model = Game_canvas.View_model
 
-module Action = struct
-  type t =
-    | Start_run
-    | Quit
-    | Move of Direction.t
-    | Finish_cutscene
-  [@@deriving sexp_of]
-end
-
-let apply_action flow (action : Action.t) =
-  match action with
-  | Start_run -> Flow.start_run flow
-  | Quit -> Flow.quit flow
-  | Move direction -> Flow.move flow direction
-  | Finish_cutscene -> Flow.finish_cutscene flow
-;;
-
-(* Held keys back the lobby's per-frame walking, so they live in a ref the
-   canvas widget reads directly; most recently pressed first. *)
+(* Held keys back the widget's per-frame walking (lobby and in-game), so they
+   live in a ref the canvas reads directly; most recently pressed first. *)
 let press held direction =
   held
   := direction
@@ -34,6 +19,10 @@ let release held direction =
   held := List.filter !held ~f:(fun d -> not (Direction.equal d direction))
 ;;
 
+(* Screen transitions the chrome requests; the widget drains this queue each
+   frame and applies them to its live game. *)
+let push_command commands command = commands := command :: !commands
+
 let key_of_event event =
   Js.Optdef.case
     event##.key
@@ -41,33 +30,34 @@ let key_of_event event =
     (fun key -> Some (Js.to_string key))
 ;;
 
-let on_keydown ~held ~inject ~screen ~can_enter event =
+let on_keydown ~held ~commands ~screen ~can_enter event =
   match Option.bind (key_of_event event) ~f:Controls.intent_of_key with
   | None -> Vdom.Effect.Ignore
   | Some intent ->
-    (* Arrows and Space would scroll the page. *)
+    (* Arrows and Space would otherwise scroll the page. *)
     Dom.preventDefault event;
     (match intent with
      | Move direction ->
+       (* Record the key; the widget's animation-frame loop reads [held] and
+          drives all movement — lobby walking, entering the dunes at the gap,
+          and continuous in-game stepping — with no Bonsai round-trip. As a
+          convenience a tap of W right at the gap also enters immediately, so
+          you need not hold it (the [entered_dunes] guard prevents a double
+          start). *)
        let track = Effect.of_sync_fun (press held) direction in
-       let act =
-         match (screen : Flow.Screen.t), (direction : Direction.t) with
-         | Playing, (_ : Direction.t) -> inject (Action.Move direction)
-         | Lobby, North when can_enter ->
-           (* Stepping through the gap in the dunes, straight off the keydown
-              like the mockup. *)
-           inject Action.Start_run
-         | Lobby, (_ : Direction.t)
-         | (Cutscene _ | Won | Lost), (_ : Direction.t) ->
-           (* In the lobby the canvas walks from [held]; end screens and
-              cutscenes ignore movement. *)
-           Vdom.Effect.Ignore
-       in
-       Vdom.Effect.Many [ track; act ]
+       (match (screen : Flow.Screen.t), (direction : Direction.t) with
+        | Lobby, North when can_enter ->
+          Vdom.Effect.Many
+            [ track
+            ; Effect.of_sync_fun (push_command commands) Command.Start_run
+            ]
+        | (Lobby | Playing | Cutscene _ | Won | Lost), _ -> track)
      | Confirm ->
        (match (screen : Flow.Screen.t) with
-        | Won | Lost -> inject Action.Start_run
-        | Lobby when can_enter -> inject Action.Start_run
+        | Won | Lost ->
+          Effect.of_sync_fun (push_command commands) Command.Start_run
+        | Lobby when can_enter ->
+          Effect.of_sync_fun (push_command commands) Command.Start_run
         | Lobby | Playing | Cutscene _ -> Vdom.Effect.Ignore))
 ;;
 
@@ -144,47 +134,36 @@ let component ?(difficulty = Difficulty.default) ~random_state (local_ graph)
   =
   let config = Difficulty.config difficulty in
   let held : Direction.t list ref = ref [] in
-  let flow, inject =
-    Bonsai.state_machine
-      ~sexp_of_model:[%sexp_of: Flow.t]
-      ~sexp_of_action:[%sexp_of: Action.t]
-      ~default_model:(Flow.create ~config ~random_state ())
-      ~apply_action:(fun _context flow action -> apply_action flow action)
+  let commands : Command.t list ref = ref [] in
+  let view_model, set_view_model =
+    Bonsai.state
+      ~sexp_of_model:[%sexp_of: View_model.t]
+      ~equal:View_model.equal
+      View_model.initial
       graph
   in
-  let lobby_hud, set_lobby_hud = Bonsai.state (0, false) graph in
-  let%arr flow and inject and lobby_hud and set_lobby_hud in
-  let screen = Flow.screen flow in
-  let zone, can_enter = lobby_hud in
-  let game = Flow.game flow in
-  let score = Game.score game in
-  let slips = Game.slips game in
-  let quit _ = inject Action.Quit in
-  let retry _ = inject Action.Start_run in
+  let%arr view_model and set_view_model in
+  let { View_model.screen; score; slips; lobby_zone; can_enter } =
+    view_model
+  in
+  let quit _ = Effect.of_sync_fun (push_command commands) Command.Quit in
+  let retry _ =
+    Effect.of_sync_fun (push_command commands) Command.Start_run
+  in
   let canvas =
-    Game_canvas.node
-      { flow
-      ; cone_degrees = config.Difficulty.cone_degrees
-      ; view_cells = config.view_cells
-      ; monster_speed = config.monster_cells_per_second
-      ; held
-      ; finish_cutscene = inject Action.Finish_cutscene
-      ; start_run = inject Action.Start_run
-      ; set_lobby_hud =
-          (fun ~zone ~can_enter -> set_lobby_hud (zone, can_enter))
-      }
+    Game_canvas.node { config; random_state; held; commands; set_view_model }
   in
   let keyboard =
     [ Vdom.Attr.Global_listeners.keydown
         ~phase:Bubbling
-        ~f:(on_keydown ~held ~inject ~screen ~can_enter)
+        ~f:(on_keydown ~held ~commands ~screen ~can_enter)
     ; Vdom.Attr.Global_listeners.keyup ~phase:Bubbling ~f:(on_keyup ~held)
     ]
   in
   let overlay =
     match (screen : Flow.Screen.t) with
     | Playing -> playing_hud ~score ~slips ~quit
-    | Lobby -> lobby_caption ~zone
+    | Lobby -> lobby_caption ~zone:lobby_zone
     | Won -> won_overlay ~score ~slips ~retry ~quit
     | Lost -> lost_overlay ~retry ~quit
     | Cutscene (_ : Cutscene.Event.t) -> Vdom.Node.none
