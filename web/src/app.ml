@@ -31,6 +31,9 @@ let key_of_event event =
 ;;
 
 let on_keydown ~held ~commands ~screen ~can_enter event =
+  (* Any keypress is the gesture browsers require before audio may start; the
+     lobby bed has been waiting on it since the first frame. *)
+  Audio.unlock ();
   match Option.bind (key_of_event event) ~f:Controls.intent_of_key with
   | None -> Vdom.Effect.Ignore
   | Some intent ->

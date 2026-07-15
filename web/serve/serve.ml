@@ -18,6 +18,7 @@ let content_type file =
   | Some "html" -> "text/html; charset=utf-8"
   | Some "js" -> "text/javascript; charset=utf-8"
   | Some "css" -> "text/css; charset=utf-8"
+  | Some "mp3" -> "audio/mpeg"
   | Some ("png" | "ico") -> "image/png"
   | Some _ | None -> "application/octet-stream"
 ;;

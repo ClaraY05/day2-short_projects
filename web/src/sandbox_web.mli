@@ -8,6 +8,9 @@
 (** The page: state machine, chrome, HUD and key handling. *)
 module App = App
 
+(** Looping music beds and one-shot sound effects. *)
+module Audio = Audio
+
 (** Float-friendly wrapper over the js_of_ocaml 2D canvas API. *)
 module Canvas2d = Canvas2d
 
