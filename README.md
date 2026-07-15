@@ -1,3 +1,30 @@
+# Slip — a banana horror maze
+
+A top-down maze traversal horror game in the terminal: find the key by
+torchlight, dodge the monster, and mind the bananas — slip on one and
+you wake up with the walls rearranged. See `DESIGN.md` for the design
+and architecture.
+
+```sh
+dune exec app/bin/main.exe   # play (needs a real TTY)
+```
+
+While playing: `w` walks forward, `a`/`d` turn, `s` turns around, `q`
+gives up. The view always faces the way you do.
+
+```
+engine/src/   pure game logic: Maze, Game, Monster, Viewport (sandbox.engine)
+engine/test/  expect tests, incl. 100-seed generation invariants
+app/src/      terminal front end: Render, Game_loop, Cutscene (sandbox.app)
+app/test/     screen-rendering expect tests
+app/bin/      the executable
+assets/       future sounds and cutscene art
+```
+
+---
+
+Built from the OCaml project template below.
+
 # OCaml project template
 
 A blank OCaml project in the Jane Street style: [`Core`](https://opam.ocaml.org/packages/core/)

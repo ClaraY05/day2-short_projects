@@ -1,0 +1,6 @@
+(library
+ (name sandbox_app)
+ (public_name sandbox.app)
+ (libraries core core_unix sandbox_engine)
+ (preprocess
+  (pps ppx_jane)))
