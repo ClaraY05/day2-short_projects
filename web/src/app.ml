@@ -30,38 +30,50 @@ let key_of_event event =
     (fun key -> Some (Js.to_string key))
 ;;
 
-let on_keydown ~held ~commands ~screen ~can_enter event =
+let choose_difficulty difficulty chosen = difficulty := chosen
+
+let on_keydown ~held ~commands ~screen ~can_enter ~difficulty event =
   (* Any keypress is the gesture browsers require before audio may start; the
      lobby bed has been waiting on it since the first frame. *)
   Audio.unlock ();
-  match Option.bind (key_of_event event) ~f:Controls.intent_of_key with
-  | None -> Vdom.Effect.Ignore
-  | Some intent ->
-    (* Arrows and Space would otherwise scroll the page. *)
+  let key = key_of_event event in
+  match
+    (screen : Flow.Screen.t), Option.bind key ~f:Controls.difficulty_of_key
+  with
+  | Lobby, Some chosen ->
+    (* 1 / 2 / 3 pick a preset in the lobby book; the widget reads it when
+       the next run starts. *)
     Dom.preventDefault event;
-    (match intent with
-     | Move direction ->
-       (* Record the key; the widget's animation-frame loop reads [held] and
-          drives all movement — lobby walking, entering the dunes at the gap,
-          and continuous in-game stepping — with no Bonsai round-trip. As a
-          convenience a tap of W right at the gap also enters immediately, so
-          you need not hold it (the [entered_dunes] guard prevents a double
-          start). *)
-       let track = Effect.of_sync_fun (press held) direction in
-       (match (screen : Flow.Screen.t), (direction : Direction.t) with
-        | Lobby, North when can_enter ->
-          Vdom.Effect.Many
-            [ track
-            ; Effect.of_sync_fun (push_command commands) Command.Start_run
-            ]
-        | (Lobby | Playing | Cutscene _ | Won | Lost), _ -> track)
-     | Confirm ->
-       (match (screen : Flow.Screen.t) with
-        | Won | Lost ->
-          Effect.of_sync_fun (push_command commands) Command.Start_run
-        | Lobby when can_enter ->
-          Effect.of_sync_fun (push_command commands) Command.Start_run
-        | Lobby | Playing | Cutscene _ -> Vdom.Effect.Ignore))
+    Effect.of_sync_fun (choose_difficulty difficulty) chosen
+  | _, _ ->
+    (match Option.bind key ~f:Controls.intent_of_key with
+     | None -> Vdom.Effect.Ignore
+     | Some intent ->
+       (* Arrows and Space would otherwise scroll the page. *)
+       Dom.preventDefault event;
+       (match intent with
+        | Move direction ->
+          (* Record the key; the widget's animation-frame loop reads [held]
+             and drives all movement — lobby walking, entering the dunes at
+             the gap, and continuous in-game stepping — with no Bonsai
+             round-trip. As a convenience a tap of W right at the gap also
+             enters immediately, so you need not hold it (the [entered_dunes]
+             guard prevents a double start). *)
+          let track = Effect.of_sync_fun (press held) direction in
+          (match (screen : Flow.Screen.t), (direction : Direction.t) with
+           | Lobby, North when can_enter ->
+             Vdom.Effect.Many
+               [ track
+               ; Effect.of_sync_fun (push_command commands) Command.Start_run
+               ]
+           | (Lobby | Playing | Cutscene _ | Won | Lost), _ -> track)
+        | Confirm ->
+          (match (screen : Flow.Screen.t) with
+           | Won | Lost ->
+             Effect.of_sync_fun (push_command commands) Command.Start_run
+           | Lobby when can_enter ->
+             Effect.of_sync_fun (push_command commands) Command.Start_run
+           | Lobby | Playing | Cutscene _ -> Vdom.Effect.Ignore)))
 ;;
 
 let on_keyup ~held event =
@@ -95,6 +107,45 @@ let lobby_caption ~zone =
           ◂ ▸ / A D  walk the camp  ·  ▲ W  enter the dunes at the gap
         </div>
       </div>
+    </div>
+  |}
+;;
+
+let difficulty_row ~slot ~difficulty ~selected =
+  let is_selected = Difficulty.equal difficulty selected in
+  {%html|
+    <div %{Styles.book_row ~is_selected}>
+      <span %{Styles.book_slot ~is_selected}>#{Int.to_string slot}</span>
+      <span %{Styles.book_label ~is_selected}>#{Difficulty.label difficulty}</span>
+    </div>
+  |}
+;;
+
+let difficulty_book ~selected =
+  let rows =
+    List.mapi Difficulty.all ~f:(fun index difficulty ->
+      difficulty_row ~slot:(index + 1) ~difficulty ~selected)
+  in
+  {%html|
+    <div %{Styles.book_area}>
+      <div %{Styles.book_panel}>
+        <div %{Styles.book_title}>◈ CHOOSE YOUR TRIAL</div>
+        %{Vdom.Node.div ~attrs:[ Styles.book_rows ] rows}
+        <div %{Styles.book_hint}>#{Difficulty.blurb selected}</div>
+        <div %{Styles.book_hint}>PRESS 1 · 2 · 3</div>
+      </div>
+    </div>
+  |}
+;;
+
+(* The lobby chrome: the difficulty book pinned top-left, the trader's
+   caption along the bottom. Both are absolutely placed against the console
+   frame. *)
+let lobby_overlay ~zone ~selected =
+  {%html|
+    <div>
+      %{difficulty_book ~selected}
+      %{lobby_caption ~zone}
     </div>
   |}
 ;;
@@ -139,9 +190,10 @@ let component
   ~random_state
   (local_ graph)
   =
-  let config = Difficulty.config difficulty in
   let held : Direction.t list ref = ref [] in
   let commands : Command.t list ref = ref [] in
+  (* The lobby book writes this; the widget reads it when a run starts. *)
+  let difficulty : Difficulty.t ref = ref difficulty in
   let view_model, set_view_model =
     Bonsai.state
       ~sexp_of_model:[%sexp_of: View_model.t]
@@ -150,7 +202,14 @@ let component
       graph
   in
   let%arr view_model and set_view_model in
-  let { View_model.screen; score; slips; lobby_zone; can_enter } =
+  let { View_model.screen
+      ; score
+      ; slips
+      ; lobby_zone
+      ; can_enter
+      ; difficulty = selected
+      }
+    =
     view_model
   in
   let quit _ = Effect.of_sync_fun (push_command commands) Command.Quit in
@@ -159,7 +218,7 @@ let component
   in
   let canvas =
     Game_canvas.node
-      { config
+      { difficulty
       ; random_state
       ; reveal_all = map_view
       ; held
@@ -170,14 +229,14 @@ let component
   let keyboard =
     [ Vdom.Attr.Global_listeners.keydown
         ~phase:Bubbling
-        ~f:(on_keydown ~held ~commands ~screen ~can_enter)
+        ~f:(on_keydown ~held ~commands ~screen ~can_enter ~difficulty)
     ; Vdom.Attr.Global_listeners.keyup ~phase:Bubbling ~f:(on_keyup ~held)
     ]
   in
   let overlay =
     match (screen : Flow.Screen.t) with
     | Playing -> playing_hud ~score ~slips ~quit
-    | Lobby -> lobby_caption ~zone:lobby_zone
+    | Lobby -> lobby_overlay ~zone:lobby_zone ~selected
     | Won -> won_overlay ~score ~slips ~retry ~quit
     | Lost -> lost_overlay ~retry ~quit
     | Cutscene (_ : Cutscene.Event.t) -> Vdom.Node.none

@@ -9,6 +9,18 @@ type t =
 
 let default = Normal
 
+let label = function
+  | Easy -> "EASY"
+  | Normal -> "NORMAL"
+  | Nightmare -> "NIGHTMARE"
+;;
+
+let blurb = function
+  | Easy -> "slow beast, wide torch"
+  | Normal -> "the dunes as intended"
+  | Nightmare -> "a sprinter in the dark"
+;;
+
 type config =
   { rows : int
   ; cols : int
@@ -28,27 +40,27 @@ let config = function
     ; cols = 31
     ; num_bananas = 9
     ; cone_degrees = 46.
-    ; view_cells = 7.
+    ; view_cells = 8.4
     ; monster = (module Monster.Chaser : Monster.S)
-    ; monster_cells_per_second = 2.7
+    ; monster_cells_per_second = 2.025
     }
   | Normal ->
     { rows = 31
     ; cols = 31
     ; num_bananas = 16
     ; cone_degrees = 40.
-    ; view_cells = 6.
+    ; view_cells = 7.2
     ; monster = (module Monster.Prowler : Monster.S)
-    ; monster_cells_per_second = 3.6
+    ; monster_cells_per_second = 2.7
     }
   | Nightmare ->
     { rows = 31
     ; cols = 31
     ; num_bananas = 24
     ; cone_degrees = 32.
-    ; view_cells = 5.
+    ; view_cells = 6.
     ; monster = (module Monster.Sprinter : Monster.S)
-    ; monster_cells_per_second = 4.7
+    ; monster_cells_per_second = 3.525
     }
 ;;
 
