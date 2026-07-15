@@ -56,7 +56,12 @@ let serve ~port () =
     "Camel O is running \xe2\x80\x94 open http://localhost:%d/ in a browser\n\
      %!"
     port;
-  printf "(serving %s; press Ctrl-C to stop)\n%!" root;
+  printf
+    "(map view at http://localhost:%d/map_view.html; serving %s; press \
+     Ctrl-C to stop)\n\
+     %!"
+    port
+    root;
   Deferred.never ()
 ;;
 

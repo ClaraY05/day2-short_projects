@@ -20,6 +20,9 @@ module Input : sig
     ; cone_degrees : float (** beam half-angle, before any torch boost *)
     ; view_cells : float (** beam reach, before any torch boost *)
     ; monster_speed : float (** beast glide speed, cells per second *)
+    ; reveal_all : bool
+    (** [true] for the map view: paint the whole maze fully lit with
+        {!Maze_scene.draw_map} instead of the torch beam *)
     ; held : Direction.t list ref
     (** keys currently held, most recent first; shared with {!App}'s keyboard
         listeners *)

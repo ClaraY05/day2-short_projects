@@ -13,12 +13,18 @@
 (rule
  (copy ../bin/main.bc.js main.bc.js))
 
+(rule
+ (copy ../bin/map_view.html map_view.html))
+
+(rule
+ (copy ../bin/map_view.bc.js map_view.bc.js))
+
 ; A throwaway module the launcher depends on, so building the launcher also
-; builds (and copies) the js bundle: one [dune exec] does everything.
+; builds (and copies) the js bundles: one [dune exec] does everything.
 
 (rule
  (target bundle_ready.ml)
- (deps index.html main.bc.js)
+ (deps index.html main.bc.js map_view.html map_view.bc.js)
  (action
   (with-stdout-to
    bundle_ready.ml

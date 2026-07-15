@@ -29,3 +29,17 @@ val draw
   -> cone_degrees:float (** beam half-angle, torch boost included *)
   -> view_cells:float (** beam reach, torch boost included *)
   -> unit
+
+(** [draw_map] is the map-view counterpart of {!draw}: the whole maze scaled
+    to fit the canvas and lit end to end — no torch cone, darkness or
+    vignette — for watching it reshuffle when the trader slips on a banana.
+    Same continuous entity coordinates as {!draw}; it just pulls the camera
+    all the way out. *)
+val draw_map
+  :  ctx:Canvas2d.t
+  -> now_ms:float
+  -> maze:Maze.t
+  -> player:entity
+  -> facing:Direction.t
+  -> monster:entity
+  -> unit

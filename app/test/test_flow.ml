@@ -26,6 +26,15 @@ let create ~seed =
   Flow.create ~config ~random_state:(Random.State.make [| seed |]) ()
 ;;
 
+(* The map-view front end: same flow, only [cutscenes:false]. *)
+let create_map_view ~seed =
+  Flow.create
+    ~config
+    ~cutscenes:false
+    ~random_state:(Random.State.make [| seed |])
+    ()
+;;
+
 let print_screen flow = print_s [%sexp (Flow.screen flow : Flow.Screen.t)]
 
 (* Teleports the player to a floor cell adjacent to [target], facing it, and
@@ -130,6 +139,44 @@ let%expect_test "walking into the beast plays the jumpscare, then the lose \
     Lost
     Playing
     (fresh_score 0)
+    |}]
+;;
+
+let%expect_test "map view: a banana slip skips the cutscene and resumes \
+                 straight in the reshuffled maze"
+  =
+  let flow = Flow.start_run (create_map_view ~seed:2) in
+  let banana =
+    Set.choose_exn (Maze.bananas (Game.maze_exn (Flow.game flow)))
+  in
+  let flow = step_onto flow banana in
+  print_screen flow;
+  print_s
+    [%message
+      ""
+        ~slips:(Game.slips (Flow.game flow) : int)
+        ~woke_on_banana_cell:
+          (Position.equal (Game.player_exn (Flow.game flow)) banana : bool)];
+  [%expect
+    {|
+    Playing
+    ((slips 1) (woke_on_banana_cell true))
+    |}]
+;;
+
+let%expect_test "map view: winning and losing skip their cutscenes too" =
+  let won = Flow.start_run (create_map_view ~seed:1) in
+  let won = step_onto won (Maze.key (Game.maze_exn (Flow.game won))) in
+  print_screen won;
+  let lost = Flow.start_run (create_map_view ~seed:3) in
+  let lost =
+    step_onto lost (Monster.position (Game.monster_exn (Flow.game lost)))
+  in
+  print_screen lost;
+  [%expect
+    {|
+    Won
+    Lost
     |}]
 ;;
 

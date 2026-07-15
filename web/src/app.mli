@@ -18,8 +18,14 @@ open! Core
 open Bonsai_web
 open Sandbox_app
 
+(** [map_view] (default [false]) is the debug front end: the same page, lobby
+    and HUD, but the maze is drawn whole and fully lit
+    ({!Sandbox_web.Maze_scene.draw_map}) and the cutscenes are skipped
+    ({!Sandbox_app.Flow.create}'s [cutscenes]), so a banana slip drops
+    straight back into the freshly reshuffled maze. *)
 val component
   :  ?difficulty:Difficulty.t (** default {!Difficulty.default} *)
+  -> ?map_view:bool (** default [false] *)
   -> random_state:Random.State.t
   -> local_ Bonsai.graph
   -> Vdom.Node.t Bonsai.t

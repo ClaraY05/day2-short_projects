@@ -140,7 +140,11 @@ let lost_overlay ~retry ~quit =
   |}
 ;;
 
-let component ?(difficulty = Difficulty.default) ~random_state (local_ graph)
+let component
+  ?(difficulty = Difficulty.default)
+  ?(map_view = false)
+  ~random_state
+  (local_ graph)
   =
   let config = Difficulty.config difficulty in
   let held : Direction.t list ref = ref [] in
@@ -148,7 +152,8 @@ let component ?(difficulty = Difficulty.default) ~random_state (local_ graph)
     Bonsai.state_machine
       ~sexp_of_model:[%sexp_of: Flow.t]
       ~sexp_of_action:[%sexp_of: Action.t]
-      ~default_model:(Flow.create ~config ~random_state ())
+      ~default_model:
+        (Flow.create ~config ~cutscenes:(not map_view) ~random_state ())
       ~apply_action:(fun _context flow action -> apply_action flow action)
       graph
   in
@@ -167,6 +172,7 @@ let component ?(difficulty = Difficulty.default) ~random_state (local_ graph)
       ; cone_degrees = config.Difficulty.cone_degrees
       ; view_cells = config.view_cells
       ; monster_speed = config.monster_cells_per_second
+      ; reveal_all = map_view
       ; held
       ; finish_cutscene = inject Action.Finish_cutscene
       ; start_run = inject Action.Start_run

@@ -183,3 +183,53 @@ let draw
     ~stops:[ 0., "rgba(0,0,0,0)"; 1., "rgba(0,0,0,0.86)" ];
   C.fill_rect ctx ~x:0. ~y:0. ~w ~h
 ;;
+
+(* The map view: the whole maze fitted to the canvas and fully lit — no torch
+   cone, darkness overlay or vignette. A single transform scales the
+   40px-per-cell scene down to fit, so every cell and sprite is reused from
+   [draw] above, just at full brightness and with the camera pulled all the
+   way out. *)
+let draw_map ~ctx ~now_ms ~maze ~player ~facing ~monster =
+  let w = C.width ctx in
+  let h = C.height ctx in
+  C.set_fill ctx Palette.void;
+  C.fill_rect ctx ~x:0. ~y:0. ~w ~h;
+  let cols = Maze.cols maze in
+  let rows = Maze.rows maze in
+  let maze_w = to_px (Float.of_int cols) in
+  let maze_h = to_px (Float.of_int rows) in
+  let scale = Float.min (w /. maze_w) (h /. maze_h) in
+  C.save ctx;
+  (* Center the scaled maze in the canvas. *)
+  C.translate
+    ctx
+    ~x:((w -. (maze_w *. scale)) /. 2.)
+    ~y:((h -. (maze_h *. scale)) /. 2.);
+  C.scale ctx ~x:scale ~y:scale;
+  List.iter (List.range 0 rows) ~f:(fun row ->
+    List.iter (List.range 0 cols) ~f:(fun col ->
+      draw_cell
+        ctx
+        ~maze
+        ~cell:(Position.create ~row ~col)
+        ~sx:(to_px (Float.of_int col))
+        ~sy:(to_px (Float.of_int row))
+        ~now_ms
+        ~brightness:1.));
+  Sprites.beast
+    ~ctx
+    ~x:(to_px monster.col)
+    ~y:(to_px monster.row)
+    ~cell_size
+    ~color:Palette.beast;
+  Sprites.trader
+    ~ctx
+    ~x:(to_px player.col)
+    ~y:(to_px player.row +. 13.)
+    ~facing
+    ~now_ms
+    ~moving:player.moving
+    ~scale:1.
+    ();
+  C.restore ctx
+;;
