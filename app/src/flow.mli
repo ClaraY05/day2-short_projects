@@ -33,9 +33,13 @@ end
 type t [@@deriving sexp_of]
 
 (** [create ~random_state ()] sits in the lobby. [config] defaults to
-    {!Difficulty.default}'s config. *)
+    {!Difficulty.default}'s config. [cutscenes] defaults to [true]; pass
+    [false] for the map-view front end, where {!move} skips the [Cutscene]
+    screens and resolves straight to [Playing] (the reshuffled maze after a
+    slip), [Won] or [Lost]. *)
 val create
   :  ?config:Difficulty.config
+  -> ?cutscenes:bool (** default [true] *)
   -> random_state:Random.State.t
   -> unit
   -> t
@@ -56,8 +60,9 @@ val start_run : t -> t
 val quit : t -> t
 
 (** One turn-based tick: face [direction], step, let the beast move. Slips,
-    wins and losses come back as the matching cutscene screen. A no-op off
-    the [Playing] screen. *)
+    wins and losses come back as the matching cutscene screen (or, when
+    [create]'s [cutscenes] is [false], as [Playing]/[Won]/[Lost] directly). A
+    no-op off the [Playing] screen. *)
 val move : t -> Direction.t -> t
 
 (** What the current cutscene resolves into: the reshuffled maze for

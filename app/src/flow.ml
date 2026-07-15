@@ -14,6 +14,7 @@ end
 type t =
   { game : Game.t
   ; screen : Screen.t
+  ; cutscenes : bool
   }
 
 let sexp_of_t t =
@@ -26,7 +27,7 @@ let sexp_of_t t =
 let screen t = t.screen
 let game t = t.game
 
-let create ?config ~random_state () =
+let create ?config ?(cutscenes = true) ~random_state () =
   let config =
     Option.value config ~default:(Difficulty.config Difficulty.default)
   in
@@ -40,7 +41,7 @@ let create ?config ~random_state () =
       ~random_state
       ()
   in
-  { game; screen = Lobby }
+  { game; screen = Lobby; cutscenes }
 ;;
 
 (* Drives the underlying game to [Start_screen] no matter where it is: end
@@ -55,12 +56,13 @@ let start_run t =
   match t.screen with
   | Playing | Cutscene _ -> t
   | Lobby | Won | Lost ->
-    { game = Game.handle_action (rewind_game t.game) Start
+    { t with
+      game = Game.handle_action (rewind_game t.game) Start
     ; screen = Playing
     }
 ;;
 
-let quit t = { game = rewind_game t.game; screen = Lobby }
+let quit t = { t with game = rewind_game t.game; screen = Lobby }
 
 let move t direction =
   match t.screen with
@@ -68,17 +70,19 @@ let move t direction =
   | Playing ->
     let slips_before = Game.slips t.game in
     let game = Game.handle_action t.game (Move_absolute direction) in
+    let slipped = Game.slips game > slips_before in
+    (* With cutscenes off (the map view) each beat resolves straight to its
+       screen; the engine has already reshuffled the maze on a slip, so the
+       player simply wakes in the new one. *)
     let screen : Screen.t =
       match Game.phase game with
-      | Won -> Cutscene Finding_o
-      | Lost -> Cutscene Jumpscare
-      | Playing ->
-        if Game.slips game > slips_before
-        then Cutscene Banana_slip
-        else Playing
       | Start_screen -> Lobby
+      | Won -> if t.cutscenes then Cutscene Finding_o else Won
+      | Lost -> if t.cutscenes then Cutscene Jumpscare else Lost
+      | Playing ->
+        if t.cutscenes && slipped then Cutscene Banana_slip else Playing
     in
-    { game; screen }
+    { t with game; screen }
 ;;
 
 module For_testing = struct

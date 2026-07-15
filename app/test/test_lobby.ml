@@ -47,8 +47,8 @@ let%expect_test "walking east crosses the four dialogue zones and unlocks \
     |}]
 ;;
 
-let%expect_test "the world has edges, and standing still faces the last \
-                 direction walked"
+let%expect_test "the trader stops at the campfire and the gap, and standing \
+                 still faces the last direction walked"
   =
   let lobby = Lobby.step (Lobby.create ()) ~dt:60. ~held:(Some West) in
   print_lobby lobby;
@@ -58,8 +58,8 @@ let%expect_test "the world has edges, and standing still faces the last \
   print_lobby lobby;
   [%expect
     {|
-    ((x 120) (facing West) (is_walking true) (zone 0) (can_enter false))
-    ((x 120) (facing West) (is_walking false) (zone 0) (can_enter false))
+    ((x 272) (facing West) (is_walking true) (zone 0) (can_enter false))
+    ((x 272) (facing West) (is_walking false) (zone 0) (can_enter false))
     ((x 1780) (facing East) (is_walking true) (zone 3) (can_enter true))
     |}]
 ;;

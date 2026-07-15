@@ -13,6 +13,12 @@
 (rule
  (copy ../bin/main.bc.js main.bc.js))
 
+(rule
+ (copy ../bin/map_view.html map_view.html))
+
+(rule
+ (copy ../bin/map_view.bc.js map_view.bc.js))
+
 ; The uploaded sound effects, copied next to the launcher so it serves them
 ; over HTTP by their bare names (see {!Sandbox_web.Audio}).
 
@@ -20,12 +26,17 @@
  (files ../../assets/*.mp3))
 
 ; A throwaway module the launcher depends on, so building the launcher also
-; builds (and copies) the js bundle and the audio: one [dune exec] does
+; builds (and copies) the js bundles and the audio: one [dune exec] does
 ; everything.
 
 (rule
  (target bundle_ready.ml)
- (deps index.html main.bc.js (glob_files *.mp3))
+ (deps
+  index.html
+  main.bc.js
+  map_view.html
+  map_view.bc.js
+  (glob_files *.mp3))
  (action
   (with-stdout-to
    bundle_ready.ml

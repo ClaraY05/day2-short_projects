@@ -29,10 +29,7 @@ module Effect = struct
 
   (* Pickups fire constantly, so they sit at half the volume of the rare,
      dramatic cues. *)
-  let volume = function
-    | Item_pickup -> 0.1
-    | Game_over | Banana_slip -> 0.6
-  ;;
+  let volume = function Item_pickup -> 0.1 | Game_over | Banana_slip -> 0.6
 end
 
 let make_element ~file ~loop ~volume =
@@ -59,8 +56,7 @@ let music_element =
          ~volume:Music.volume)
   in
   function
-  | Music.Lobby -> Lazy.force lobby
-  | Gameplay -> Lazy.force gameplay
+  | Music.Lobby -> Lazy.force lobby | Gameplay -> Lazy.force gameplay
 ;;
 
 let effect_element =
@@ -100,10 +96,7 @@ let current : Music.t option ref = ref None
 (* play () can reject its promise (e.g. a race with a pause); the binding
    types it [unit] and drops the promise, so guard only against a synchronous
    throw. *)
-let start element =
-  try element##play with
-  | _ -> ()
-;;
+let start element = try element##play with _ -> ()
 
 let apply_desired () =
   match !desired, !current with

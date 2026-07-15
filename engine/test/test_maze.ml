@@ -124,7 +124,7 @@ let%expect_test "of_ascii round-trips and reads features" =
   [%expect {| ((key ((row 1) (col 1))) (bananas (((row 1) (col 3))))) |}]
 ;;
 
-let%expect_test "collecting a dot or torch removes just that cell" =
+let%expect_test "collecting a dot, torch or banana removes just that cell" =
   let maze = Maze.For_testing.of_ascii {|#####
 #K.T#
 #.#.#
@@ -132,8 +132,10 @@ let%expect_test "collecting a dot or torch removes just that cell" =
 #####|} in
   let dot = Position.create ~row:2 ~col:1 in
   let torch = Position.create ~row:1 ~col:3 in
+  let banana = Position.create ~row:3 ~col:3 in
   let collected = Maze.collect_dot maze dot in
   let collected = Maze.collect_torch collected torch in
+  let collected = Maze.collect_banana collected banana in
   print_s
     [%message
       ""
@@ -141,12 +143,14 @@ let%expect_test "collecting a dot or torch removes just that cell" =
         ~dots_after:(Maze.num_dots collected : int)
         ~dot_gone:(not (Maze.is_dot collected dot) : bool)
         ~torch_gone:(not (Maze.is_torch collected torch) : bool)
+        ~banana_gone:(not (Maze.is_banana collected banana) : bool)
+        ~bananas_after:(Maze.num_bananas collected : int)
         ~others_untouched:
           (Maze.is_dot collected (Position.create ~row:3 ~col:1) : bool)];
   [%expect
     {|
     ((dots_before 5) (dots_after 4) (dot_gone true) (torch_gone true)
-     (others_untouched true))
+     (banana_gone true) (bananas_after 0) (others_untouched true))
     |}]
 ;;
 

@@ -65,31 +65,15 @@ let dune_band ctx ~cam_x ~base_y ~amplitude ~frequency ~phase ~color ~factor =
   C.fill ctx
 ;;
 
-let draw_entrance ctx ~x:ex ~now_ms ~can_enter =
+(* The gap the trader heads for — the dark opening and its warm pulse. Drawn
+   behind the trader so he stands in front of the doorway as he nears it,
+   then behind the flanking mounds ({!draw_entrance_front}). *)
+let draw_entrance_back ctx ~x:ex ~now_ms =
   let g = ground_y in
-  (* Dune mounds either side of the gap. *)
-  C.set_fill ctx "#3a1c0c";
-  C.begin_path ctx;
-  C.move_to ctx ~x:(ex -. 195.) ~y:(g +. 40.);
-  C.quadratic_curve_to
-    ctx
-    ~cx:(ex -. 82.)
-    ~cy:(g -. 210.)
-    ~x:(ex -. 34.)
-    ~y:(g +. 40.);
-  C.fill ctx;
-  C.begin_path ctx;
-  C.move_to ctx ~x:(ex +. 34.) ~y:(g +. 40.);
-  C.quadratic_curve_to
-    ctx
-    ~cx:(ex +. 92.)
-    ~cy:(g -. 222.)
-    ~x:(ex +. 205.)
-    ~y:(g +. 40.);
-  C.fill ctx;
-  (* The dark opening. *)
+  (* The dark opening. Its base meets the ground line, where the trader
+     stands. *)
   C.set_fill ctx "#080503";
-  C.fill_rect ctx ~x:(ex -. 30.) ~y:(g -. 120.) ~w:60. ~h:160.;
+  C.fill_rect ctx ~x:(ex -. 30.) ~y:(g -. 120.) ~w:60. ~h:120.;
   C.begin_path ctx;
   C.arc ctx ~x:ex ~y:(g -. 120.) ~r:30. ~a0:Float.pi ~a1:0.;
   C.fill ctx;
@@ -104,7 +88,43 @@ let draw_entrance ctx ~x:ex ~now_ms ~can_enter =
       [ 0., [%string "rgba(217,122,30,%{pulse +. 0.1#Float})"]
       ; 1., "rgba(217,122,30,0)"
       ];
-  C.fill_rect ctx ~x:(ex -. 72.) ~y:(g -. 104.) ~w:144. ~h:144.;
+  C.fill_rect ctx ~x:(ex -. 72.) ~y:(g -. 104.) ~w:144. ~h:144.
+;;
+
+(* The right-hand dune, painted behind the ground and the signpost so it
+   reads as a hill rising further back rather than a mound in front of the
+   camp. Its base meets the ground line, where the trader stands. *)
+let draw_entrance_right_dune ctx ~x:ex =
+  let g = ground_y in
+  C.set_fill ctx "#3a1c0c";
+  C.begin_path ctx;
+  C.move_to ctx ~x:(ex +. 34.) ~y:g;
+  C.quadratic_curve_to
+    ctx
+    ~cx:(ex +. 92.)
+    ~cy:(g -. 222.)
+    ~x:(ex +. 205.)
+    ~y:g;
+  C.fill ctx
+;;
+
+(* The left dune mound flanking the gap, the signpost, and the enter prompt.
+   Drawn in front of the trader so the mound occludes him as he passes — a
+   foreground hill hides what walks behind it. Its base runs past the ground
+   line so it sits over the near sand. *)
+let draw_entrance_front ctx ~x:ex ~now_ms ~can_enter =
+  let g = ground_y in
+  (* Left dune mound, beside the gap. *)
+  C.set_fill ctx "#3a1c0c";
+  C.begin_path ctx;
+  C.move_to ctx ~x:(ex -. 195.) ~y:(g +. 40.);
+  C.quadratic_curve_to
+    ctx
+    ~cx:(ex -. 82.)
+    ~cy:(g -. 210.)
+    ~x:(ex -. 34.)
+    ~y:(g +. 40.);
+  C.fill ctx;
   (* Signpost. *)
   C.set_fill ctx "#5a3a1a";
   C.fill_rect ctx ~x:(ex +. 62.) ~y:(g -. 56.) ~w:6. ~h:56.;
@@ -166,15 +186,16 @@ let draw_camp ctx ~x:cx ~now_ms =
   C.fill ctx;
   C.set_fill ctx "#e0b85a";
   C.fill_rect ctx ~x:(cx -. 3.) ~y:(g -. 66.) ~w:4. ~h:6.;
-  (* Crate. *)
+  (* Crate, to the right of the tent (the campfire took the left). *)
   C.set_fill ctx "#6a4420";
-  C.fill_rect ctx ~x:(cx -. 80.) ~y:(g -. 20.) ~w:20. ~h:20.;
+  C.fill_rect ctx ~x:(cx +. 56.) ~y:(g -. 20.) ~w:20. ~h:20.;
   C.set_fill ctx "#5a3818";
-  C.fill_rect ctx ~x:(cx -. 80.) ~y:(g -. 20.) ~w:20. ~h:3.;
-  C.fill_rect ctx ~x:(cx -. 72.) ~y:(g -. 20.) ~w:3. ~h:20.;
-  (* Campfire. *)
+  C.fill_rect ctx ~x:(cx +. 56.) ~y:(g -. 20.) ~w:20. ~h:3.;
+  C.fill_rect ctx ~x:(cx +. 64.) ~y:(g -. 20.) ~w:3. ~h:20.;
+  (* Campfire, left of the tent; matches [Lobby.campfire_x], where the trader
+     is stopped from walking any further left. *)
   let flicker = Float.sin (now_ms /. 80.) *. 3. in
-  let fx = cx +. 74. in
+  let fx = cx -. 74. in
   C.radial_gradient
     ctx
     ~x:fx
@@ -201,10 +222,10 @@ let draw_camp ctx ~x:cx ~now_ms =
   C.fill ctx
 ;;
 
-let draw_truck ctx ~x:tx =
-  let g = ground_y in
+let draw_truck ctx ~x:tx ~base_y ~scale =
   C.save ctx;
-  C.translate ctx ~x:tx ~y:(g -. 2.);
+  C.translate ctx ~x:tx ~y:base_y;
+  C.scale ctx ~x:scale ~y:scale;
   C.rotate ctx (-0.14);
   (* Tipped-over bed, wheels in the air. *)
   C.set_fill ctx "#cfa94e";
@@ -237,6 +258,24 @@ let draw_truck ctx ~x:tx =
   C.fill_rect ctx ~x:(-10.) ~y:(-3.) ~w:20. ~h:7.;
   C.restore ctx;
   C.restore ctx
+;;
+
+(* The tipped banana truck, off on a dune in the background. Drawn before the
+   ground so the near sand and the trader pass in front of it, and shrunk so
+   it reads as distant. *)
+let draw_truck_hill ctx ~x:tx =
+  let g = ground_y in
+  C.set_fill ctx "#6e3a1a";
+  C.begin_path ctx;
+  C.move_to ctx ~x:(tx -. 175.) ~y:(g +. 40.);
+  C.quadratic_curve_to
+    ctx
+    ~cx:tx
+    ~cy:(g -. 172.)
+    ~x:(tx +. 175.)
+    ~y:(g +. 40.);
+  C.fill ctx;
+  draw_truck ctx ~x:tx ~base_y:(g -. 66.) ~scale:0.6
 ;;
 
 let draw ~ctx ~now_ms ~lobby ~scatter ~can_enter =
@@ -324,6 +363,10 @@ let draw ~ctx ~now_ms ~lobby ~scatter ~can_enter =
     ~phase:1.7
     ~color:"#5a2a12"
     ~factor:0.6;
+  (* Background hills, before the ground and the trader paint in front: the
+     truck's dune and the right entrance dune. *)
+  draw_truck_hill ctx ~x:(on_screen Lobby.truck_x);
+  draw_entrance_right_dune ctx ~x:(on_screen Lobby.entrance_x);
   (* Ground. *)
   C.linear_gradient
     ctx
@@ -335,10 +378,10 @@ let draw ~ctx ~now_ms ~lobby ~scatter ~can_enter =
   C.fill_rect ctx ~x:0. ~y:g ~w ~h:(h -. g);
   C.set_fill ctx "#ffd98a";
   C.fill_rect ctx ~x:0. ~y:g ~w ~h:3.;
-  (* Landmarks. *)
-  draw_entrance ctx ~x:(on_screen Lobby.entrance_x) ~now_ms ~can_enter;
+  (* Landmarks. The gap's dark mouth sits behind the trader; its flanking
+     dune mounds are painted later, in front of him. *)
+  draw_entrance_back ctx ~x:(on_screen Lobby.entrance_x) ~now_ms;
   draw_camp ctx ~x:(on_screen Lobby.camp_x) ~now_ms;
-  draw_truck ctx ~x:(on_screen Lobby.truck_x);
   Array.iter scatter.spill ~f:(fun { peel_x; peel_lift; peel_rotation } ->
     let px = on_screen peel_x in
     if Float.( >= ) px (-20.) && Float.( <= ) px (w +. 20.)
@@ -371,6 +414,9 @@ let draw ~ctx ~now_ms ~lobby ~scatter ~can_enter =
     ~moving:(Lobby.is_walking lobby)
     ~scale:trader_scale
     ();
+  (* The left dune mound and signpost, in front of the trader so he passes
+     behind the mound instead of climbing over it. *)
+  draw_entrance_front ctx ~x:(on_screen Lobby.entrance_x) ~now_ms ~can_enter;
   (* Title. *)
   C.set_text_align ctx "center";
   C.set_fill ctx Palette.title_yellow;

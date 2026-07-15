@@ -87,6 +87,13 @@ val collect_dot : t -> Position.t -> t
 
 val collect_torch : t -> Position.t -> t
 
+(** [collect_banana t position] is [t] without the banana at [position] (a
+    no-op if there is none there). The engine's {!regenerate} already drops
+    the stepped-on banana; this lets the web front end lift it from a
+    snapshot of the pre-slip maze so the player is seen stepping onto bare
+    floor as the slip cutscene begins. *)
+val collect_banana : t -> Position.t -> t
+
 (** All floor cells, in no particular order. Handy for spawning things; see
     {!Game}. *)
 val floor_cells : t -> Position.t list

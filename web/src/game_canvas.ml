@@ -8,6 +8,13 @@ let canvas_width = 720
 let canvas_height = 560
 let player_speed_cells_per_second = 5.3
 
+(* Before the slip cutscene takes the screen, the trader is seen stepping the
+   last cell onto the banana over the pre-slip maze; the banana is lifted and
+   the cutscene begins the instant they land, so the step takes exactly as
+   long as any other. A safety cap ends the beat even if the glide never
+   reports arrival (e.g. a teleport snap). *)
+let banana_approach_max_seconds = 0.5
+
 (* Steps further apart than this are teleports (monster respawns, maze
    reshuffles): snap instead of gliding across the map. *)
 let snap_distance_cells = 2.
@@ -43,6 +50,7 @@ module Input = struct
   type t =
     { config : Difficulty.config
     ; random_state : Random.State.t
+    ; reveal_all : bool
     ; held : Direction.t list ref
     ; commands : Command.t list ref
     ; set_view_model : View_model.t -> unit Effect.t
@@ -115,6 +123,20 @@ module Glide = struct
   ;;
 end
 
+(* Everything the "walk onto the banana" beat needs, snapshotted the moment
+   the slip cutscene begins: the engine has already reshuffled the maze by
+   then, so we render this frozen copy of the maze the player was standing
+   in, with the banana still in place until they reach it. *)
+module Slip = struct
+  type t =
+    { maze : Maze.t
+    ; target : Position.t
+    ; facing : Direction.t
+    ; cone_degrees : float
+    ; view_cells : float
+    }
+end
+
 module State = struct
   type t =
     { canvas : Dom_html.canvasElement Js.t
@@ -136,6 +158,11 @@ module State = struct
       mutable last_score : int
     ; mutable last_torch_ticks : int
     ; mutable last_view_model : View_model.t option
+    ; (* The maze rendered on the last [Playing] frame, frozen so the
+         banana-approach beat can walk the trader across it after the engine
+         has reshuffled. *)
+      mutable last_playing_maze : Maze.t option
+    ; mutable slip : Slip.t option
     ; scatter : Lobby_scene.scatter
     ; support : Cutscene_scene.support
     ; random_state : Random.State.t (* for rendering jitter, not the game *)
@@ -191,13 +218,47 @@ let music_for_screen : Flow.Screen.t -> Audio.Music.t = function
   | Playing | Cutscene _ | Won | Lost -> Gameplay
 ;;
 
+(* The torch pickup widens and lengthens the beam for a while. *)
+let cone_and_view (state : State.t) game =
+  let torch_lit = Game.torch_ticks_exn game > 0 in
+  let config = state.input.config in
+  let cone_degrees =
+    config.Difficulty.cone_degrees
+    +. if torch_lit then Difficulty.torch_cone_bonus_degrees else 0.
+  in
+  let view_cells =
+    config.view_cells
+    +. if torch_lit then Difficulty.torch_view_bonus_cells else 0.
+  in
+  cone_degrees, view_cells
+;;
+
+(* The step onto the banana that precedes the slip: freeze the maze the
+   player just left (the engine has already reshuffled [Flow.game]'s maze) so
+   the approach animation has something to walk across. *)
+let capture_slip (state : State.t) =
+  match state.last_playing_maze with
+  | None -> None
+  | Some maze ->
+    let game = Flow.game state.flow in
+    let cone_degrees, view_cells = cone_and_view state game in
+    Some
+      { Slip.maze
+      ; target = Game.player_exn game
+      ; facing = Game.facing_exn game
+      ; cone_degrees
+      ; view_cells
+      }
+;;
+
 let on_screen_change (state : State.t) (screen : Flow.Screen.t) =
   (match screen with
    | Lobby ->
      state.lobby <- Lobby.create ();
      state.entered_dunes <- false;
      state.player <- None;
-     state.monster <- None
+     state.monster <- None;
+     state.slip <- None
    | Playing ->
      (* Fresh glides at the new spawn (a new run, or waking after a slip). *)
      let game = Flow.game state.flow in
@@ -205,15 +266,20 @@ let on_screen_change (state : State.t) (screen : Flow.Screen.t) =
      state.monster
      <- Some (Glide.create (Monster.position (Game.monster_exn game)));
      state.last_score <- Game.score game;
-     state.last_torch_ticks <- Game.torch_ticks_exn game
+     state.last_torch_ticks <- Game.torch_ticks_exn game;
+     state.slip <- None
    | Cutscene event ->
      state.cutscene_started_ms <- None;
      state.cutscene_finish_applied <- false;
      (match event with
-      | Banana_slip -> Audio.play_effect Banana_slip
-      | Jumpscare -> Audio.play_effect Game_over
-      | Finding_o -> ())
-   | Won | Lost -> ());
+      | Banana_slip ->
+        Audio.play_effect Banana_slip;
+        state.slip <- capture_slip state
+      | Jumpscare ->
+        Audio.play_effect Game_over;
+        state.slip <- None
+      | Finding_o -> state.slip <- None)
+   | Won | Lost -> state.slip <- None);
   state.prev_screen <- screen
 ;;
 
@@ -244,6 +310,9 @@ let advance_playing (state : State.t) ~dt =
   let game = Flow.game state.flow in
   match Game.phase game, state.player, state.monster with
   | Playing, Some player, Some monster ->
+    (* Freeze this maze in case the next step is the one that slips onto a
+       banana: the banana-approach beat renders over it. *)
+    state.last_playing_maze <- Some (Game.maze_exn game);
     Glide.retarget player (Game.player_exn game);
     Glide.retarget monster (Monster.position (Game.monster_exn game));
     Glide.advance player ~dt ~speed:player_speed_cells_per_second;
@@ -259,16 +328,36 @@ let advance_playing (state : State.t) ~dt =
       | None -> ()
       | Some direction ->
         state.flow <- Flow.move state.flow direction;
-        (match Game.phase (Flow.game state.flow) with
+        (* Only chase the new positions while still playing; a step that
+           slipped, won or lost hands the glides to the cutscene beat (which
+           walks the trader onto the banana over the frozen maze) or freezes
+           them under the end-screen overlay. *)
+        (match Flow.screen state.flow with
          | Playing ->
            let game = Flow.game state.flow in
            Glide.retarget player (Game.player_exn game);
            Glide.retarget monster (Monster.position (Game.monster_exn game))
-         | Start_screen | Won | Lost -> ()))
+         | Lobby | Cutscene _ | Won | Lost -> ()))
   | (Playing | Start_screen | Won | Lost), _, _ -> ()
 ;;
 
-let advance_cutscene (state : State.t) ~now_ms ~event =
+(* Glides the trader the last cell onto the banana at the normal walk speed;
+   returns whether they have landed. *)
+let advance_slip (state : State.t) ~dt ~(slip : Slip.t) =
+  let player =
+    match state.player with
+    | Some glide -> glide
+    | None ->
+      let glide = Glide.create slip.target in
+      state.player <- Some glide;
+      glide
+  in
+  Glide.retarget player slip.target;
+  Glide.advance player ~dt ~speed:player_speed_cells_per_second;
+  not (Glide.is_moving player)
+;;
+
+let advance_cutscene (state : State.t) ~now_ms ~dt ~event =
   let started =
     match state.cutscene_started_ms with
     | Some started -> started
@@ -277,11 +366,22 @@ let advance_cutscene (state : State.t) ~now_ms ~event =
       now_ms
   in
   let elapsed = (now_ms -. started) /. 1000. in
-  if Float.( >= ) elapsed (Cutscene.duration_seconds event)
-     && not state.cutscene_finish_applied
-  then (
-    state.cutscene_finish_applied <- true;
-    state.flow <- Flow.finish_cutscene state.flow)
+  match state.slip with
+  | Some slip ->
+    (* [Banana_slip] leads with the trader stepping onto the banana at the
+       normal walk speed. The moment they land (or the cap fires) the
+       cutscene clock is restarted so the pratfall itself begins from zero. *)
+    let arrived = advance_slip state ~dt ~slip in
+    if arrived || Float.( >= ) elapsed banana_approach_max_seconds
+    then (
+      state.slip <- None;
+      state.cutscene_started_ms <- None)
+  | None ->
+    if Float.( >= ) elapsed (Cutscene.duration_seconds event)
+       && not state.cutscene_finish_applied
+    then (
+      state.cutscene_finish_applied <- true;
+      state.flow <- Flow.finish_cutscene state.flow)
 ;;
 
 let current_view_model (state : State.t) : View_model.t =
@@ -316,41 +416,78 @@ let render_playing (state : State.t) ~now_ms =
   let game = Flow.game state.flow in
   match Game.phase game, state.player, state.monster with
   | Playing, Some player, Some monster ->
-    let torch_lit = Game.torch_ticks_exn game > 0 in
-    let config = state.input.config in
-    let cone_degrees =
-      config.Difficulty.cone_degrees
-      +. if torch_lit then Difficulty.torch_cone_bonus_degrees else 0.
-    in
-    let view_cells =
-      config.view_cells
-      +. if torch_lit then Difficulty.torch_view_bonus_cells else 0.
-    in
-    Maze_scene.draw
-      ~ctx:state.ctx
-      ~now_ms
-      ~random_state:state.random_state
-      ~maze:(Game.maze_exn game)
-      ~player:(Glide.entity player)
-      ~facing:(Game.facing_exn game)
-      ~monster:(Glide.entity monster)
-      ~cone_degrees
-      ~view_cells
+    (match state.input.reveal_all with
+     | true ->
+       (* The map view: the whole maze, fully lit, so the reshuffle is
+          visible end to end. *)
+       Maze_scene.draw_map
+         ~ctx:state.ctx
+         ~now_ms
+         ~maze:(Game.maze_exn game)
+         ~player:(Glide.entity player)
+         ~facing:(Game.facing_exn game)
+         ~monster:(Glide.entity monster)
+     | false ->
+       let cone_degrees, view_cells = cone_and_view state game in
+       Maze_scene.draw
+         ~ctx:state.ctx
+         ~now_ms
+         ~random_state:state.random_state
+         ~maze:(Game.maze_exn game)
+         ~player:(Glide.entity player)
+         ~facing:(Game.facing_exn game)
+         ~monster:(Glide.entity monster)
+         ~cone_degrees
+         ~view_cells)
   | (Playing | Start_screen | Won | Lost), _, _ ->
     (* Won/Lost leave the last maze frame frozen under the vdom overlay. *)
     ()
 ;;
 
-let render_cutscene (state : State.t) ~now_ms ~event =
-  let started = Option.value state.cutscene_started_ms ~default:now_ms in
-  let t_seconds = (now_ms -. started) /. 1000. in
-  Cutscene_scene.draw
+(* The trader takes the final step onto the banana over the frozen pre-slip
+   maze; the banana vanishes the instant they land, right before the pratfall
+   cutscene takes the whole screen. *)
+let render_slip_approach (state : State.t) ~now_ms ~(slip : Slip.t) =
+  let entity =
+    match state.player with
+    | Some glide -> Glide.entity glide
+    | None -> Glide.entity (Glide.create slip.target)
+  in
+  let maze =
+    if entity.moving
+    then slip.maze
+    else Maze.collect_banana slip.maze slip.target
+  in
+  let monster =
+    match state.monster with
+    | Some glide -> Glide.entity glide
+    | None -> entity
+  in
+  Maze_scene.draw
     ~ctx:state.ctx
-    ~event
-    ~t_seconds
     ~now_ms
     ~random_state:state.random_state
-    ~support:state.support
+    ~maze
+    ~player:entity
+    ~facing:slip.facing
+    ~monster
+    ~cone_degrees:slip.cone_degrees
+    ~view_cells:slip.view_cells
+;;
+
+let render_cutscene (state : State.t) ~now_ms ~event =
+  match state.slip with
+  | Some slip -> render_slip_approach state ~now_ms ~slip
+  | None ->
+    let started = Option.value state.cutscene_started_ms ~default:now_ms in
+    let t_seconds = (now_ms -. started) /. 1000. in
+    Cutscene_scene.draw
+      ~ctx:state.ctx
+      ~event
+      ~t_seconds
+      ~now_ms
+      ~random_state:state.random_state
+      ~support:state.support
 ;;
 
 let draw_frame (state : State.t) ~now_ms =
@@ -366,14 +503,14 @@ let draw_frame (state : State.t) ~now_ms =
   (match Flow.screen state.flow with
    | Lobby -> advance_lobby state ~dt
    | Playing -> advance_playing state ~dt
-   | Cutscene event -> advance_cutscene state ~now_ms ~event
+   | Cutscene event -> advance_cutscene state ~now_ms ~dt ~event
    | Won | Lost -> ());
   (* 3. react to any screen the advance produced (spawns, resets). *)
   let screen = Flow.screen state.flow in
   if not (Flow.Screen.equal screen state.prev_screen)
   then on_screen_change state screen;
-  (* 4. keep the right bed looping (idempotent; also starts the opening
-     lobby music, which no transition announces) and sound any pickup. *)
+  (* 4. keep the right bed looping (idempotent; also starts the opening lobby
+     music, which no transition announces) and sound any pickup. *)
   Audio.play_music (music_for_screen screen);
   (match screen with
    | Playing -> detect_pickup state
@@ -424,8 +561,14 @@ module Widget = struct
     (* Rendering jitter uses a throwaway generator so it never perturbs the
        game's own maze RNG (which lives inside the flow). *)
     let random_state = Random.State.default in
+    (* The map view runs with cutscenes off, so each beat resolves straight
+       to its screen and the reshuffle is watched in full. *)
     let flow =
-      Flow.create ~config:input.config ~random_state:input.random_state ()
+      Flow.create
+        ~config:input.config
+        ~cutscenes:(not input.reveal_all)
+        ~random_state:input.random_state
+        ()
     in
     let state =
       { State.canvas
@@ -444,6 +587,8 @@ module Widget = struct
       ; last_score = 0
       ; last_torch_ticks = 0
       ; last_view_model = None
+      ; last_playing_maze = None
+      ; slip = None
       ; scatter = Lobby_scene.scatter ~random_state
       ; support = Cutscene_scene.support ~random_state
       ; random_state

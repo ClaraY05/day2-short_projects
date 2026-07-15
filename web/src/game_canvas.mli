@@ -54,6 +54,10 @@ module Input : sig
   type t =
     { config : Difficulty.config
     ; random_state : Random.State.t
+    ; reveal_all : bool
+    (** [true] for the map-view front end: run with cutscenes off and paint
+        the whole maze fully lit with {!Maze_scene.draw_map} instead of the
+        torch beam, so the reshuffle after a slip is watched end to end. *)
     ; held : Direction.t list ref
     ; commands : Command.t list ref
     ; set_view_model : View_model.t -> unit Effect.t
